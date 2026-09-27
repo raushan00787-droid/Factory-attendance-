@@ -1160,14 +1160,13 @@ function searchRecords(){
 
 function settingsPage(){
   return `
-    <div class="page-header"><div><h1>Settings</h1><p>Change office login credentials and manage local app data.</p></div></div>
+    <div class="page-header"><div><h1>Settings</h1><p>Manage your office account and local app options.</p></div></div>
 
     <div class="settings-card">
-      <h2>Office Login</h2>
-      <p class="muted">These credentials are stored in this browser's local storage. No Gmail password is stored here.</p>
-      <div class="form-group"><label>Office ID</label><input id="officeIdInput" value="${esc(state.settings.officeId)}"></div>
-      <div class="form-group"><label>New Office Password</label><input id="officePasswordInput" type="password" placeholder="Leave blank to keep current password"></div>
-      <button class="btn primary" onclick="saveSettings()">Save Settings</button>
+      <h2>Office Account</h2>
+      <p class="muted">Your Office ID and factory records are synced online when Firebase cloud mode is enabled.</p>
+      <div class="form-group"><label>Office ID</label><input value="${esc(state.settings.officeId)}" readonly></div>
+      <div class="small" style="margin-bottom:16px">${firebaseReady ? "☁️ Cloud sync is connected." : "⚠️ Local fallback mode. Cross-device sync is not active."}</div>
     </div>
 
     <div class="settings-card">
@@ -1178,7 +1177,7 @@ function settingsPage(){
 
     <div class="settings-card danger-card">
       <h2>Reset Application</h2>
-      <p class="muted">Deletes all workers and attendance records stored in this browser.</p>
+      <p class="muted">Deletes all workers and attendance records for the current office. In cloud mode, the reset is synced to the office account.</p>
       <button class="btn danger" onclick="resetApplication()">Reset All Data</button>
     </div>
   `;
