@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<title>Factory Attendance</title>
+
+<style>
+:root{
+  --bg:#f5f7fb;
+  --card:#ffffff;
+  --text:#111827;
+  --muted:#6b7280;
+  --line:#e5e7eb;
+  --primary:#1d4ed8;
+  --primary-dark:#1e40af;
+  --green:#15803d;
+  --green-bg:#dcfce7;
+  --red:#b91c1c;
+  --red-bg:#fee2e2;
+  --blue-bg:#dbeafe;
+  --orange:#b45309;
+  --orange-bg:#fef3c7;
+  --purple:#6d28d9;
+  --purple-bg:#ede9fe;
+  --sidebar:#0b1220;
+  --sidebar-text:#dbe4f0;
+  --sidebar-muted:#95a3b8;
+  --shadow:0 10px 30px rgba(15,23,42,.08);
+  --radius:18px;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;min-height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+.muted{color:var(--muted)}
+.small{font-size:12px;color:var(--muted)}
+
+/* ---------------- LOGIN ---------------- */
+.login-screen{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:
+    radial-gradient(circle at 15% 10%,rgba(59,130,246,.18),transparent 32%),
+    radial-gradient(circle at 90% 90%,rgba(99,102,241,.16),transparent 34%),
+    #eef2ff;
+}
+.login-card{
+  width:min(440px,100%);
+  background:#fff;
+  border:1px solid rgba(229,231,235,.9);
+  border-radius:26px;
+  padding:34px;
+  box-shadow:0 24px 70px rgba(15,23,42,.14);
+}
+.brand-mark{
+  width:58px;height:58px;border-radius:18px;
+  display:grid;place-items:center;
+  background:#111827;color:#fff;font-weight:800;font-size:24px;
+  margin:0 auto 16px;
+}
+.login-card h1{text-align:center;margin:0;font-size:28px}
+.login-card .subtitle{text-align:center;color:var(--muted);margin:8px 0 28px}
+.google-stage{text-align:center}
+.google-stage .google-title{font-weight:700;margin-bottom:8px}
+.google-stage .google-copy{font-size:14px;color:var(--muted);margin-bottom:22px}
+#googleButton{display:flex;justify-content:center;min-height:44px}
+.google-status{margin-top:18px;font-size:13px;color:var(--muted);min-height:18px}
+.login-divider{display:flex;align-items:center;gap:10px;margin:22px 0;color:#9ca3af;font-size:12px}
+.login-divider::before,.login-divider::after{content:"";height:1px;background:var(--line);flex:1}
+
+.office-login{display:none}
+.office-login.active{display:block}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;background:#f3f4f6;border-radius:12px;padding:4px;margin-bottom:24px}
+.auth-tab{border:0;background:transparent;padding:10px;border-radius:9px;font-weight:700;color:#6b7280}
+.auth-tab.active{background:#fff;color:#111827;box-shadow:0 2px 7px rgba(15,23,42,.08)}
+
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:13px;font-weight:700;margin-bottom:7px}
+.form-group input,.form-group select,.search-box input,.date-control select{
+  width:100%;border:1px solid #d1d5db;background:#fff;border-radius:12px;padding:12px 13px;outline:none;transition:.18s;
+}
+.form-group input:focus,.form-group select:focus,.search-box input:focus,.date-control select:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.btn{
+  border:0;border-radius:12px;padding:11px 16px;font-weight:800;transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--primary);color:#fff}
+.btn.primary:hover{background:var(--primary-dark)}
+.btn.secondary{background:#eef2f7;color:#111827}
+.btn.danger{background:#fee2e2;color:#991b1b}
+.btn.full{width:100%}
+
+/* ---------------- APP SHELL ---------------- */
+#app{min-height:100vh}
+.app-shell{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}
+.sidebar{background:var(--sidebar);color:#fff;padding:22px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+.sidebar-brand{display:flex;align-items:center;gap:12px;padding:4px 10px 24px}
+.sidebar-logo{width:42px;height:42px;border-radius:13px;background:#fff;color:#111827;display:grid;place-items:center;font-weight:900}
+.sidebar-brand strong{font-size:15px;line-height:1.1}
+.sidebar-brand span{display:block;color:var(--sidebar-muted);font-size:11px;margin-top:4px}
+.nav{display:flex;flex-direction:column;gap:6px}
+.nav button{border:0;background:transparent;color:var(--sidebar-text);padding:11px 12px;border-radius:11px;text-align:left;font-weight:700;display:flex;align-items:center;gap:11px}
+.nav button:hover{background:rgba(255,255,255,.06)}
+.nav button.active{background:rgba(255,255,255,.12);color:#fff}
+.sidebar-bottom{margin-top:auto;padding-top:15px;border-top:1px solid rgba(255,255,255,.08)}
+.sidebar-bottom button{width:100%}
+.main{min-width:0}
+.topbar{height:66px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 26px;position:sticky;top:0;z-index:20}
+.topbar .title{font-weight:900}
+.topbar .user-pill{display:flex;align-items:center;gap:9px;color:#374151;font-size:13px}
+.avatar-sm{width:34px;height:34px;border-radius:50%;background:#dbeafe;color:#1e40af;display:grid;place-items:center;font-weight:800}
+.content{padding:26px;max-width:1500px;margin:auto}
+.page-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:22px}
+.page-header h1{margin:0;font-size:29px}
+.page-header p{margin:5px 0 0;color:var(--muted)}
+.actions{display:flex;gap:9px;flex-wrap:wrap}
+
+/* ---------------- CARDS / DASHBOARD ---------------- */
+.summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}
+.summary-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 3px 15px rgba(15,23,42,.03)}
+.summary-card span{display:block;color:var(--muted);font-size:12px;font-weight:700;margin-bottom:9px}
+.summary-card strong{font-size:23px}
+.grid-2{display:grid;grid-template-columns:1.25fr .75fr;gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 3px 18px rgba(15,23,42,.03);padding:20px;margin-bottom:18px}
+.card-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.card-header h2{margin:0;font-size:18px}
+.card-header p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.quick-action{border:1px solid var(--line);background:#fff;border-radius:14px;padding:16px;text-align:left}
+.quick-action strong{display:block;margin-top:8px}
+.quick-action span{color:var(--muted);font-size:12px}
+
+.search-box{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid var(--line);border-radius:13px;padding:0 13px;margin-bottom:18px;max-width:560px}
+.search-box input{border:0;box-shadow:none;padding-left:0}
+.search-box input:focus{box-shadow:none}
+.worker-list{display:grid;gap:10px}
+.worker-row,.record-worker-row{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:15px;padding:14px;cursor:pointer}
+.worker-row:hover,.record-worker-row:hover{border-color:#bfdbfe;box-shadow:0 4px 15px rgba(15,23,42,.04)}
+.avatar{width:45px;height:45px;border-radius:14px;background:#eff6ff;color:#1d4ed8;display:grid;place-items:center;font-weight:900}
+.worker-main strong{display:block}
+.worker-main span{color:var(--muted);font-size:12px}
+.worker-meta{text-align:right}
+.worker-meta strong{display:block}
+.worker-meta span{font-size:11px;color:var(--muted)}
+.row-arrow{font-size:28px;color:#9ca3af;line-height:1}
+.record-worker-type{font-size:12px;font-weight:800;color:#4b5563}
+.empty-state{background:#fff;border:1px dashed #cbd5e1;border-radius:16px;padding:40px;text-align:center;color:var(--muted)}
+.empty-icon{font-size:32px;margin-bottom:10px}
+
+/* ---------------- STATUS ---------------- */
+.status-badge{display:inline-flex;align-items:center;justify-content:center;min-width:46px;padding:6px 9px;border-radius:999px;font-size:11px;font-weight:900}
+.status-P{background:var(--green-bg);color:var(--green)}
+.status-A{background:var(--red-bg);color:var(--red)}
+.status-EL{background:var(--blue-bg);color:#1d4ed8}
+.status-CL{background:var(--purple-bg);color:var(--purple)}
+.status-WO{background:#f3f4f6;color:#4b5563}
+.status-empty{background:#f9fafb;color:#9ca3af}
+.weekly-off{padding:15px;border-radius:13px;background:#f3f4f6;color:#374151;font-weight:800}
+.attendance-actions{display:flex;gap:10px;flex-wrap:wrap}
+.attendance-btn{width:58px;height:42px;border:1px solid var(--line);border-radius:12px;background:#fff;font-weight:900}
+.attendance-btn:hover{transform:translateY(-1px)}
+.attendance-btn.present.active{background:var(--green-bg);border-color:#86efac;color:var(--green)}
+.attendance-btn.absent.active{background:var(--red-bg);border-color:#fca5a5;color:var(--red)}
+.attendance-btn.el.active{background:var(--blue-bg);border-color:#93c5fd;color:#1d4ed8}
+.attendance-btn.cl.active{background:var(--purple-bg);border-color:#c4b5fd;color:var(--purple)}
+
+/* ---------------- TABLE ---------------- */
+.table-wrap{width:100%;overflow:auto;border:1px solid var(--line);border-radius:14px}
+table{width:100%;border-collapse:collapse;min-width:620px;background:#fff}
+th,td{text-align:left;padding:12px 13px;border-bottom:1px solid #eef0f3;font-size:13px;white-space:nowrap}
+th{background:#f8fafc;color:#4b5563;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+tr:last-child td{border-bottom:0}
+
+/* ---------------- WORKER DETAIL ---------------- */
+.detail-banner{display:flex;align-items:center;gap:15px;margin-bottom:18px}
+.detail-avatar{width:66px;height:66px;border-radius:18px;background:#e0ecff;color:#1e40af;display:grid;place-items:center;font-weight:900;font-size:21px}
+.detail-banner h2{margin:0;font-size:22px}
+.detail-banner p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.period-tabs{display:flex;gap:6px;background:#eef2f7;padding:4px;border-radius:12px;width:max-content;margin-bottom:16px}
+.period-tabs button{border:0;background:transparent;padding:9px 14px;border-radius:9px;color:#6b7280;font-weight:800}
+.period-tabs button.active{background:#fff;color:#111827;box-shadow:0 2px 7px rgba(15,23,42,.08)}
+.date-control{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.date-control select{width:auto;min-width:150px}
+.record-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.record-mini{border:1px solid var(--line);border-radius:13px;padding:13px;background:#fff}
+.record-mini span{display:block;color:var(--muted);font-size:11px;font-weight:700}
+.record-mini strong{display:block;margin-top:6px;font-size:17px}
+
+/* ---------------- MODAL ---------------- */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:100}
+.modal{width:min(620px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:20px;box-shadow:0 30px 90px rgba(15,23,42,.28)}
+.modal-header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px 22px;border-bottom:1px solid var(--line)}
+.modal-header h2{margin:0;font-size:19px}
+.close-btn{border:0;background:#f3f4f6;border-radius:10px;width:36px;height:36px;font-size:20px;color:#4b5563}
+.modal-body{padding:22px}
+.modal-actions{display:flex;justify-content:flex-end;gap:9px;padding:0 22px 22px}
+
+/* ---------------- SETTINGS ---------------- */
+.settings-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:16px;max-width:720px}
+.settings-card h2{margin:0 0 7px;font-size:18px}
+.settings-card .muted{font-size:13px;margin-bottom:19px}
+.danger-card{border-color:#fecaca}
+
+/* ---------------- TOAST ---------------- */
+.toast{position:fixed;right:20px;bottom:20px;background:#111827;color:#fff;padding:13px 16px;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.18);font-size:13px;z-index:200;display:none;max-width:min(420px,90vw)}
+.toast.show{display:block}
+
+/* ---------------- MOBILE ---------------- */
+.mobile-nav{display:none}
+@media (max-width:1050px){
+  .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid-2{grid-template-columns:1fr}
+  .record-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:760px){
+  .app-shell{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .topbar{padding:0 16px}
+  .content{padding:18px 14px 86px}
+  .mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:50;padding:7px 6px;justify-content:space-around}
+  .mobile-nav button{border:0;background:transparent;font-size:10px;color:#6b7280;font-weight:800;padding:7px 8px}
+  .mobile-nav button.active{color:var(--primary)}
+  .page-header{flex-direction:column}
+  .summary-grid{grid-template-columns:1fr 1fr}
+  .record-summary{grid-template-columns:1fr 1fr}
+  .worker-row,.record-worker-row{grid-template-columns:auto 1fr auto}
+  .worker-meta,.record-worker-type{display:none}
+  .login-card{padding:27px 21px}
+}
+@media (max-width:430px){
+  .summary-grid{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+  .quick-actions{grid-template-columns:1fr}
+  .record-summary{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+
+<body>
+
+<!-- Google Identity Services. The button is initialized by our script below. -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<div id="root"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+/* =========================================================
+   FACTORY ATTENDANCE SYSTEM
+   Single-file app: Google Sign-In -> Office/Worker Login -> App
+   ========================================================= */
+
+const STORAGE_KEY = "factory_attendance_v6";
+const SESSION_KEY = "factory_attendance_session_v6";
+const GOOGLE_SESSION_KEY = "factory_google_session_v6";
+const FIXED_SALARY = 15000;
+const GOOGLE_CLIENT_ID = "43409647151-pprbk4thfoem6svhib5vg3vbn9hkbh73.apps.googleusercontent.com";
+
+let currentPage = "dashboard";
+let selectedWorker = null;
+let recordMode = "monthly";
+let recordDate = new Date();
+let authMode = "office";
+let googleInitialized = false;
+
+let state = loadState();
+let session = loadSession();
+
+function defaultState(){
+  return {
+    version: 6,
+    settings: {
+      officeId: "admin",
+      officePassword: "admin123"
+    },
+    workers: []
+  };
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    const base = defaultState();
+    return {
+      ...base,
+      ...parsed,
+      settings: {...base.settings, ...(parsed.settings || {})},
+      workers: Array.isArray(parsed.workers) ? parsed.workers : []
+    };
+  }catch(error){
+    console.error(error);
+    return defaultState();
+  }
+}
+
+function saveData(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function loadSession(){
+  try{
+    return JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null") || {
+      loggedIn:false, role:null, workerId:null
+    };
+  }catch{
+    return {loggedIn:false, role:null, workerId:null};
+  }
+}
+
+function saveSession(){
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+function esc(value){
+  return String(value ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function initials(name){
+  const parts = String(name || "?").trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] || "?") + (parts[1]?.[0] || "")).toUpperCase();
+}
+
+function pad(n){ return String(n).padStart(2,"0"); }
+
+function isoDate(date){
+  const d = new Date(date);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+function parseDate(iso){
+  const [y,m,d] = String(iso).split("-").map(Number);
+  return new Date(y,m-1,d);
+}
+
+function todayISO(){ return isoDate(new Date()); }
+
+function isSunday(date){ return date.getDay() === 0; }
+
+function monthBounds(ym){
+  const [y,m] = String(ym).split("-").map(Number);
+  return {
+    start:new Date(y,m-1,1),
+    end:new Date(y,m,0)
+  };
+}
+
+function datesBetween(start,end){
+  const out=[];
+  const d=new Date(start);
+  d.setHours(0,0,0,0);
+  const last=new Date(end);
+  last.setHours(0,0,0,0);
+  while(d<=last){
+    out.push(new Date(d));
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+
+function monthName(ym){
+  const [y,m] = String(ym).split("-").map(Number);
+  return new Date(y,m-1,1).toLocaleDateString("en-IN",{month:"long",year:"numeric"});
+}
+
+function formatDate(iso){
+  return parseDate(iso).toLocaleDateString("en-IN",{
+    day:"2-digit",month:"short",year:"numeric"
+  });
+}
+
+function formatCurrency(value){
+  return `₹${Math.round(Number(value)||0).toLocaleString("en-IN")}`;
+}
+
+function getWorker(id){
+  return state.workers.find(w => String(w.id) === String(id));
+}
+
+function activeWorkers(type=null){
+  return state.workers.filter(w => w.active !== false && (!type || w.type === type));
+}
+
+function allWorkers(type=null){
+  return state.workers.filter(w => !type || w.type === type);
+}
+
+function ensureWorkerShape(worker){
+  if(!worker.attendance) worker.attendance={};
+  if(!worker.leaveUsed) worker.leaveUsed={EL:0,CL:0};
+  if(typeof worker.elLimit !== "number") worker.elLimit=Number(worker.elLimit||0);
+  if(typeof worker.clLimit !== "number") worker.clLimit=Number(worker.clLimit||0);
+  if(worker.salary !== FIXED_SALARY) worker.salary=FIXED_SALARY;
+  if(worker.active === undefined) worker.active=true;
+}
+
+function getStatus(worker, iso){
+  if(!worker) return "-";
+  if(isSunday(parseDate(iso))) return "WO";
+  return worker.attendance?.[iso] || "-";
+}
+
+function countWorkingDays(start,end){
+  return datesBetween(start,end).filter(d => !isSunday(d)).length;
+}
+
+function countAbsences(worker,start,end){
+  return datesBetween(start,end).filter(d => {
+    if(isSunday(d)) return false;
+    return getStatus(worker,isoDate(d)) === "A";
+  }).length;
+}
+
+function salaryCalculation(worker, ym){
+  if(!worker) return 0;
+  ensureWorkerShape(worker);
+  const bounds = monthBounds(ym);
+  const workingDays = countWorkingDays(bounds.start,bounds.end);
+  const absentDays = countAbsences(worker,bounds.start,bounds.end);
+  if(workingDays <= 0) return FIXED_SALARY;
+  const deduction = (FIXED_SALARY / workingDays) * absentDays;
+  return Math.max(0,Math.round(FIXED_SALARY - deduction));
+}
+
+function leaveStats(worker,ym){
+  if(!worker) return {EL:0,CL:0};
+  const bounds=monthBounds(ym);
+  const stats={EL:0,CL:0};
+  datesBetween(bounds.start,bounds.end).forEach(d=>{
+    const status=getStatus(worker,isoDate(d));
+    if(status === "EL") stats.EL++;
+    if(status === "CL") stats.CL++;
+  });
+  return stats;
+}
+
+function statusHTML(status){
+  const labels={P:"Present",A:"Absent",EL:"EL",CL:"CL",WO:"Weekly Off","-":"Not Marked"};
+  const cls=status === "P" ? "status-P" :
+    status === "A" ? "status-A" :
+    status === "EL" ? "status-EL" :
+    status === "CL" ? "status-CL" :
+    status === "WO" ? "status-WO" : "status-empty";
+  return `<span class="status-badge ${cls}">${labels[status] || status}</span>`;
+}
+
+function periodForMode(worker,mode,baseDate){
+  const d=new Date(baseDate);
+  d.setHours(0,0,0,0);
+
+  if(mode === "monthly"){
+    const ym=`${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+    const b=monthBounds(ym);
+    return {start:b.start,end:b.end,label:monthName(ym),key:ym};
+  }
+
+  if(mode === "yearly"){
+    const y=d.getFullYear();
+    return {
+      start:new Date(y,0,1),
+      end:new Date(y,11,31),
+      label:String(y),
+      key:String(y)
+    };
+  }
+
+  const day=d.getDay();
+  const mondayOffset=day === 0 ? -6 : 1-day;
+  const start=new Date(d);
+  start.setDate(d.getDate()+mondayOffset);
+  const end=new Date(start);
+  end.setDate(start.getDate()+6);
+  return {
+    start,
+    end,
+    label:`${start.toLocaleDateString("en-IN",{day:"2-digit",month:"short"})} - ${end.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}`,
+    key:isoDate(start)
+  };
+}
+
+function periodSummary(worker,mode,baseDate){
+  const p=periodForMode(worker,mode,baseDate);
+  let working=0,present=0,absent=0,EL=0,CL=0,WO=0;
+  datesBetween(p.start,p.end).forEach(d=>{
+    const iso=isoDate(d);
+    const status=getStatus(worker,iso);
+    if(isSunday(d)){ WO++; return; }
+    working++;
+    if(status === "P") present++;
+    if(status === "A") absent++;
+    if(status === "EL") EL++;
+    if(status === "CL") CL++;
+  });
+  const salary = mode === "monthly" ? salaryCalculation(worker,p.key) :
+    Math.max(0,Math.round(FIXED_SALARY - ((FIXED_SALARY / Math.max(1,working)) * absent)));
+  return {...p,working,present,absent,EL,CL,WO,salary};
+}
+
+/* ---------------- GOOGLE ---------------- */
+
+function hasGoogleSession(){
+  return sessionStorage.getItem(GOOGLE_SESSION_KEY) === "1";
+}
+
+function showGoogleScreen(){
+  document.getElementById("root").innerHTML = `
+    <div class="login-screen">
+      <div class="login-card">
+        <div class="brand-mark">FA</div>
+        <h1>Factory Attendance</h1>
+        <p class="subtitle">Attendance • Leave • Salary Records</p>
+
+        <div class="google-stage">
+          <div class="google-title">Continue with Google</div>
+          <div class="google-copy">Sign in with your Google account before entering the office system.</div>
+          <div id="googleButton"></div>
+          <div id="googleStatus" class="google-status"></div>
+        </div>
+      </div>
+    </div>
+  `;
+  initGoogleButton();
+}
+
+function initGoogleButton(){
+  const target=document.getElementById("googleButton");
+  if(!target) return;
+
+  if(!window.google || !window.google.accounts || !window.google.accounts.id){
+    setTimeout(initGoogleButton,400);
+    return;
+  }
+
+  if(!googleInitialized){
+    google.accounts.id.initialize({
+      client_id:GOOGLE_CLIENT_ID,
+      callback:handleGoogleCredential,
+      auto_select:false,
+      use_fedcm_for_prompt:true
+    });
+    googleInitialized=true;
+  }
+
+  target.innerHTML="";
+  google.accounts.id.renderButton(target,{
+    theme:"outline",
+    size:"large",
+    width:320,
+    text:"continue_with",
+    shape:"rectangular",
+    logo_alignment:"left"
+  });
+}
+
+function handleGoogleCredential(response){
+  if(!response || !response.credential){
+    setGoogleStatus("Google sign-in did not return a credential. Please try again.");
+    return;
+  }
+
+  sessionStorage.setItem(GOOGLE_SESSION_KEY,"1");
+  sessionStorage.setItem("factory_google_signin_time",new Date().toISOString());
+
+  let email="";
+  try{
+    const payload=decodeJwtPayload(response.credential);
+    email=payload?.email || "";
+    if(email) sessionStorage.setItem("factory_google_email",email);
+  }catch(error){
+    console.warn("Could not read Google profile payload",error);
+  }
+
+  showLogin();
+  toast(email ? `Google account connected: ${email}` : "Google account connected");
+}
+
+function decodeJwtPayload(jwt){
+  const part=String(jwt).split(".")[1];
+  if(!part) return null;
+  const normalized=part.replaceAll("-","+").replaceAll("_","/");
+  const json=decodeURIComponent(atob(normalized).split("").map(c=>"%"+c.charCodeAt(0).toString(16).padStart(2,"0")).join(""));
+  return JSON.parse(json);
+}
+
+function setGoogleStatus(message){
+  const el=document.getElementById("googleStatus");
+  if(el) el.textContent=message;
+}
+
+/* ---------------- LOGIN SCREEN ---------------- */
+
+function showLogin(){
+  if(!hasGoogleSession()){
+    showGoogleScreen();
+    return;
+  }
+
+  document.getElementById("root").innerHTML = `
+    <div class="login-screen">
+      <div class="login-card">
+        <div class="brand-mark">FA</div>
+        <h1>Office Access</h1>
+        <p class="subtitle">Google account connected. Choose your access type.</p>
+
+        <div class="auth-tabs">
+          <button id="officeTab" class="auth-tab ${authMode === "office" ? "active" : ""}" onclick="switchAuthMode('office')">Office</button>
+          <button id="workerTab" class="auth-tab ${authMode === "worker" ? "active" : ""}" onclick="switchAuthMode('worker')">Worker</button>
+        </div>
+
+        <div id="officeFormWrap"></div>
+
+        <div style="margin-top:18px;text-align:center">
+          <button class="btn secondary" onclick="restartGoogleLogin()">Use another Google account</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  renderAuthForm();
+}
+
+function switchAuthMode(mode){
+  authMode=mode;
+  renderAuthForm();
+  document.getElementById("officeTab")?.classList.toggle("active",mode === "office");
+  document.getElementById("workerTab")?.classList.toggle("active",mode === "worker");
+}
+
+function renderAuthForm(){
+  const wrap=document.getElementById("officeFormWrap");
+  if(!wrap) return;
+
+  if(authMode === "office"){
+    wrap.innerHTML=`
+      <div class="form-group">
+        <label>Office ID</label>
+        <input id="officeLoginId" autocomplete="username" placeholder="Office ID" value="">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="officeLoginPassword" type="password" autocomplete="current-password" placeholder="Password">
+      </div>
+      <button class="btn primary full" onclick="officeLogin()">Login to Office</button>
+      <p class="small" style="text-align:center;margin:13px 0 0">Default: <b>admin</b> / <b>admin123</b></p>
+    `;
+  }else{
+    wrap.innerHTML=`
+      <div class="form-group">
+        <label>Employee ID</label>
+        <input id="workerLoginId" autocomplete="username" placeholder="e.g. L001">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="workerLoginPassword" type="password" autocomplete="current-password" placeholder="Worker password">
+      </div>
+      <button class="btn primary full" onclick="workerLogin()">Worker Login</button>
+      <p class="small" style="text-align:center;margin:13px 0 0">Use the Employee ID and password given by office admin.</p>
+    `;
+  }
+}
+
+function officeLogin(){
+  const id=(document.getElementById("officeLoginId")?.value || "").trim();
+  const password=document.getElementById("officeLoginPassword")?.value || "";
+
+  if(id === state.settings.officeId && password === state.settings.officePassword){
+    session={loggedIn:true,role:"admin",workerId:null};
+    saveSession();
+    currentPage="dashboard";
+    render();
+  }else{
+    alert("Invalid Office ID or Password.");
+  }
+}
+
+function workerLogin(){
+  const id=(document.getElementById("workerLoginId")?.value || "").trim();
+  const password=document.getElementById("workerLoginPassword")?.value || "";
+  const worker=state.workers.find(w => String(w.id).toLowerCase() === id.toLowerCase() && w.active !== false);
+
+  if(worker && worker.password === password){
+    ensureWorkerShape(worker);
+    saveData();
+    session={loggedIn:true,role:"worker",workerId:worker.id};
+    saveSession();
+    currentPage="dashboard";
+    render();
+  }else{
+    alert("Invalid Employee ID or Password.");
+  }
+}
+
+function restartGoogleLogin(){
+  sessionStorage.removeItem(GOOGLE_SESSION_KEY);
+  sessionStorage.removeItem("factory_google_email");
+  session={loggedIn:false,role:null,workerId:null};
+  sessionStorage.removeItem(SESSION_KEY);
+  if(window.google?.accounts?.id){
+    try{ google.accounts.id.disableAutoSelect(); }catch{}
+  }
+  showGoogleScreen();
+}
+
+/* ---------------- RENDER ---------------- */
+
+function render(){
+  state.workers.forEach(ensureWorkerShape);
+  saveData();
+
+  if(!session.loggedIn){
+    showLogin();
+    return;
+  }
+
+  const worker = session.role === "worker" ? getWorker(session.workerId) : null;
+  if(session.role === "worker" && (!worker || worker.active === false)){
+    logout();
+    return;
+  }
+
+  if(session.role === "worker"){
+    document.getElementById("root").innerHTML=workerAppShell(worker);
+    renderWorkerPage();
+  }else{
+    document.getElementById("root").innerHTML=adminAppShell();
+    renderAdminPage();
+  }
+}
+
+function navItem(page,icon,label){
+  return `<button class="${currentPage === page ? "active" : ""}" onclick="go('${page}')"><span>${icon}</span><span>${label}</span></button>`;
+}
+
+function adminAppShell(){
+  const googleEmail=sessionStorage.getItem("factory_google_email") || "Google account";
+  return `
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-logo">FA</div>
+          <div><strong>Factory Attendance</strong><span>Office Admin</span></div>
+        </div>
+        <nav class="nav">
+          ${navItem("dashboard","⌂","Dashboard")}
+          ${navItem("labour","👷","Labour")}
+          ${navItem("management","🧑‍💼","Management")}
+          ${navItem("records","📋","Records")}
+          ${navItem("settings","⚙","Settings")}
+        </nav>
+        <div class="sidebar-bottom">
+          <button class="btn secondary" onclick="logout()">Logout</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="title">Factory Attendance</div>
+          <div class="user-pill"><div class="avatar-sm">A</div><span>${esc(googleEmail)}</span></div>
+        </header>
+        <div id="pageContent" class="content"></div>
+        <div class="mobile-nav">
+          <button class="${currentPage === "dashboard" ? "active" : ""}" onclick="go('dashboard')">⌂<br>Home</button>
+          <button class="${currentPage === "labour" ? "active" : ""}" onclick="go('labour')">👷<br>Labour</button>
+          <button class="${currentPage === "management" ? "active" : ""}" onclick="go('management')">🧑‍💼<br>Management</button>
+          <button class="${currentPage === "records" ? "active" : ""}" onclick="go('records')">📋<br>Records</button>
+          <button class="${currentPage === "settings" ? "active" : ""}" onclick="go('settings')">⚙<br>Settings</button>
+        </div>
+      </main>
+    </div>
+  `;
+}
+
+function workerAppShell(worker){
+  return `
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-logo">FA</div>
+          <div><strong>Factory Attendance</strong><span>Worker Portal</span></div>
+        </div>
+        <nav class="nav">
+          ${navItem("dashboard","⌂","My Dashboard")}
+        </nav>
+        <div class="sidebar-bottom">
+          <button class="btn secondary" onclick="logout()">Logout</button>
+        </div>
+      </aside>
+      <main class="main">
+        <header class="topbar">
+          <div class="title">Worker Portal</div>
+          <div class="user-pill"><div class="avatar-sm">${initials(worker.name)}</div><span>${esc(worker.name)}</span></div>
+        </header>
+        <div id="pageContent" class="content"></div>
+        <div class="mobile-nav">
+          <button class="active" onclick="go('dashboard')">⌂<br>Home</button>
+          <button onclick="logout()">↪<br>Logout</button>
+        </div>
+      </main>
+    </div>
+  `;
+}
+
+function go(page){
+  currentPage=page;
+  selectedWorker=null;
+  render();
+}
+
+function renderAdminPage(){
+  const wrap=document.getElementById("pageContent");
+  if(!wrap) return;
+  if(currentPage === "dashboard") wrap.innerHTML=dashboard();
+  else if(currentPage === "labour") wrap.innerHTML=workerList("labour");
+  else if(currentPage === "management") wrap.innerHTML=workerList("management");
+  else if(currentPage === "records") wrap.innerHTML=recordsPage();
+  else if(currentPage === "settings") wrap.innerHTML=settingsPage();
+}
+
+function renderWorkerPage(){
+  const wrap=document.getElementById("pageContent");
+  if(!wrap) return;
+  wrap.innerHTML=workerDashboard();
+}
+
+/* ---------------- DASHBOARD ---------------- */
+
+function dashboard(){
+  const labour=activeWorkers("labour");
+  const management=activeWorkers("management");
+  const today=todayISO();
+  const ym=today.slice(0,7);
+  const all=[...labour,...management];
+  const present=all.filter(w => getStatus(w,today)==="P").length;
+  const absent=all.filter(w => getStatus(w,today)==="A").length;
+  const leaves=all.filter(w => ["EL","CL"].includes(getStatus(w,today))).length;
+  const totalSalary=all.reduce((sum,w)=>sum+salaryCalculation(w,ym),0);
+
+  return `
+    <div class="page-header">
+      <div>
+        <h1>Dashboard</h1>
+        <p>${formatDate(today)} • ${monthName(ym)}</p>
+      </div>
+      <div class="actions"><button class="btn primary" onclick="openWorkerModal()">+ Add Worker</button></div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card"><span>Total Active Workers</span><strong>${all.length}</strong></div>
+      <div class="summary-card"><span>Present Today</span><strong>${present}</strong></div>
+      <div class="summary-card"><span>Absent Today</span><strong>${absent}</strong></div>
+      <div class="summary-card"><span>Current Payroll</span><strong>${formatCurrency(totalSalary)}</strong></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <div><h2>Quick Access</h2><p>Open your worker sections</p></div>
+        </div>
+        <div class="quick-actions">
+          <button class="quick-action" onclick="go('labour')"><div>👷</div><strong>Labour</strong><span>${labour.length} active workers</span></button>
+          <button class="quick-action" onclick="go('management')"><div>🧑‍💼</div><strong>Management</strong><span>${management.length} active workers</span></button>
+          <button class="quick-action" onclick="go('records')"><div>📋</div><strong>Records</strong><span>Monthly • Weekly • Yearly</span></button>
+          <button class="quick-action" onclick="go('settings')"><div>⚙</div><strong>Settings</strong><span>Office login settings</span></button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div><h2>Today</h2><p>Attendance overview</p></div></div>
+        ${isSunday(new Date()) ? `<div class="weekly-off">Sunday • Weekly Off</div>` : `
+          <div class="record-summary" style="grid-template-columns:1fr 1fr">
+            <div class="record-mini"><span>Present</span><strong>${present}</strong></div>
+            <div class="record-mini"><span>Absent</span><strong>${absent}</strong></div>
+            <div class="record-mini"><span>Leave</span><strong>${leaves}</strong></div>
+            <div class="record-mini"><span>Unmarked</span><strong>${Math.max(0,all.length-present-absent-leaves)}</strong></div>
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+/* ---------------- WORKER LIST ---------------- */
+
+function workerList(type){
+  const title=type === "labour" ? "Labour Workers" : "Management Workers";
+  const list=activeWorkers(type);
+  return `
+    <div class="page-header">
+      <div><h1>${title}</h1><p>${list.length} active worker${list.length===1?"":"s"}</p></div>
+      <button class="btn primary" onclick="openWorkerModal(null,'${type}')">+ Add Worker</button>
+    </div>
+    <div class="search-box"><span>🔎</span><input id="workerSearch_${type}" placeholder="Search name, employee ID or department..." oninput="searchWorkers('${type}')"></div>
+    <div id="workerRows_${type}" class="worker-list">${workerRows(list)}</div>
+  `;
+}
+
+function workerRows(list){
+  if(!list.length){
+    return `<div class="empty-state"><div class="empty-icon">👤</div><strong>No workers found</strong><p>Add workers to start maintaining attendance and salary records.</p></div>`;
+  }
+  return list.map(worker=>{
+    const ym=todayISO().slice(0,7);
+    return `
+      <div class="worker-row" onclick="openWorker('${esc(worker.id)}')">
+        <div class="avatar">${initials(worker.name)}</div>
+        <div class="worker-main"><strong>${esc(worker.name)}</strong><span>${esc(worker.id)}${worker.department ? " • "+esc(worker.department):""}</span></div>
+        <div class="worker-meta"><strong>${formatCurrency(salaryCalculation(worker,ym))}</strong><span>This month salary</span></div>
+        <div class="row-arrow">›</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function searchWorkers(type){
+  const query=(document.getElementById(`workerSearch_${type}`)?.value || "").trim().toLowerCase();
+  const workers=activeWorkers(type).filter(w =>
+    String(w.name||"").toLowerCase().includes(query) ||
+    String(w.id||"").toLowerCase().includes(query) ||
+    String(w.department||"").toLowerCase().includes(query)
+  );
+  const rows=document.getElementById(`workerRows_${type}`);
+  if(rows) rows.innerHTML=workerRows(workers);
+}
+
+/* ---------------- WORKER DETAIL ---------------- */
+
+function openWorker(id){
+  const worker=getWorker(id);
+  if(!worker) return;
+  selectedWorker=worker.id;
+  currentPage="worker-detail";
+  document.getElementById("pageContent").innerHTML=workerDetails(worker.id);
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function workerDetails(id){
+  const worker=getWorker(id);
+  if(!worker) return `<div class="empty-state">Worker not found.</div>`;
+
+  const summary=periodSummary(worker,recordMode,recordDate);
+  const leave=leaveStats(worker,todayISO().slice(0,7));
+
+  return `
+    <div class="page-header">
+      <div><button class="btn secondary" onclick="backFromWorker('${worker.type}')">← Back</button></div>
+      <div class="actions">
+        <button class="btn secondary" onclick="openWorkerModal('${esc(worker.id)}')">Edit</button>
+        <button class="btn danger" onclick="archiveWorker('${esc(worker.id)}')">Archive</button>
+      </div>
+    </div>
+
+    <div class="detail-banner">
+      <div class="detail-avatar">${initials(worker.name)}</div>
+      <div><h2>${esc(worker.name)}</h2><p>${esc(worker.id)} • ${worker.type === "management" ? "Management" : "Labour"}${worker.department ? " • "+esc(worker.department):""}</p></div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card"><span>Current Monthly Salary</span><strong>${formatCurrency(salaryCalculation(worker,todayISO().slice(0,7)))}</strong></div>
+      <div class="summary-card"><span>Period Present</span><strong>${summary.present}</strong></div>
+      <div class="summary-card"><span>Period Absent</span><strong>${summary.absent}</strong></div>
+      <div class="summary-card"><span>Period Salary</span><strong>${formatCurrency(summary.salary)}</strong></div>
+    </div>
+
+    ${worker.type === "management" ? `
+      <div class="card">
+        <div class="card-header"><div><h2>Leave Balance</h2><p>Current month</p></div></div>
+        <div class="record-summary">
+          <div class="record-mini"><span>EL Limit</span><strong>${Number(worker.elLimit||0)}</strong></div>
+          <div class="record-mini"><span>EL Used</span><strong>${leave.EL}</strong></div>
+          <div class="record-mini"><span>EL Left</span><strong>${Math.max(0,Number(worker.elLimit||0)-leave.EL)}</strong></div>
+          <div class="record-mini"><span>CL Limit</span><strong>${Number(worker.clLimit||0)}</strong></div>
+          <div class="record-mini"><span>CL Used</span><strong>${leave.CL}</strong></div>
+        </div>
+      </div>
+    `:""}
+
+    <div class="card">
+      <div class="card-header">
+        <div><h2>Attendance Records</h2><p>${summary.label}</p></div>
+        <div class="date-control">
+          <select onchange="changeRecordDate(this.value)">
+            <option value="-1">Previous</option>
+            <option value="0" selected>Current</option>
+            <option value="1">Next</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="period-tabs">
+        <button class="${recordMode === "monthly" ? "active":""}" onclick="setRecordMode('monthly')">Monthly</button>
+        <button class="${recordMode === "weekly" ? "active":""}" onclick="setRecordMode('weekly')">Weekly</button>
+        <button class="${recordMode === "yearly" ? "active":""}" onclick="setRecordMode('yearly')">Yearly</button>
+      </div>
+
+      <div class="record-summary">
+        <div class="record-mini"><span>Working Days</span><strong>${summary.working}</strong></div>
+        <div class="record-mini"><span>Present</span><strong>${summary.present}</strong></div>
+        <div class="record-mini"><span>Absent</span><strong>${summary.absent}</strong></div>
+        <div class="record-mini"><span>EL / CL</span><strong>${summary.EL} / ${summary.CL}</strong></div>
+        <div class="record-mini"><span>Salary</span><strong>${formatCurrency(summary.salary)}</strong></div>
+      </div>
+
+      ${recordTable(worker)}
+    </div>
+  `;
+}
+
+function backFromWorker(type){
+  currentPage=type;
+  selectedWorker=null;
+  renderAdminPage();
+}
+
+function setRecordMode(mode){
+  recordMode=mode;
+  recordDate=new Date();
+  document.getElementById("pageContent").innerHTML=workerDetails(selectedWorker);
+}
+
+function changeRecordDate(delta){
+  const n=Number(delta);
+  const d=new Date();
+  if(recordMode === "monthly") d.setMonth(d.getMonth()+n);
+  else if(recordMode === "yearly") d.setFullYear(d.getFullYear()+n);
+  else d.setDate(d.getDate()+n*7);
+  recordDate=d;
+  document.getElementById("pageContent").innerHTML=workerDetails(selectedWorker);
+}
+
+function recordTable(worker){
+  const p=periodForMode(worker,recordMode,recordDate);
+  const dates=datesBetween(p.start,p.end);
+
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Day</th><th>Status</th><th>Salary Effect</th><th>Change</th></tr></thead>
+        <tbody>
+          ${dates.map(d=>{
+            const iso=isoDate(d);
+            const status=getStatus(worker,iso);
+            const effect = status === "A" && !isSunday(d) ? `-${formatCurrency(FIXED_SALARY / Math.max(1,countWorkingDays(...Object.values(monthBounds(iso.slice(0,7))))))}` :
+              (status === "EL" || status === "CL" ? "Paid leave" : status === "P" || status === "WO" ? "No deduction" : "Pending");
+            return `
+              <tr>
+                <td>${formatDate(iso)}</td>
+                <td>${d.toLocaleDateString("en-IN",{weekday:"short"})}</td>
+                <td>${statusHTML(status)}</td>
+                <td>${effect}</td>
+                <td>${statusButtons(worker,iso,status)}</td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function statusButtons(worker,iso,status){
+  if(isSunday(parseDate(iso))) return `<span class="small">Weekly Off</span>`;
+  const buttons=[
+    ["P","present"],
+    ["A","absent"]
+  ];
+  if(worker.type === "management"){
+    buttons.push(["EL","el"],["CL","cl"]);
+  }
+  return `<div style="display:flex;gap:5px">${buttons.map(([s,cls])=>`<button class="attendance-btn ${cls} ${status===s?"active":""}" style="width:auto;height:34px;min-width:${s.length>1?42:34}px" onclick="adminSetStatus('${esc(worker.id)}','${iso}','${s}')">${s}</button>`).join("")}</div>`;
+}
+
+function adminSetStatus(id,iso,status){
+  const worker=getWorker(id);
+  if(!worker) return;
+  if(isSunday(parseDate(iso))){
+    alert("Sunday is a weekly off and cannot be marked.");
+    return;
+  }
+  if((status === "EL" || status === "CL") && worker.type !== "management"){
+    alert("EL/CL is available only for Management.");
+    return;
+  }
+
+  if(status === "EL" || status === "CL"){
+    const ym=iso.slice(0,7);
+    const used=leaveStats(worker,ym)[status];
+    const limit=Number(worker[status === "EL" ? "elLimit":"clLimit"] || 0);
+    const current=getStatus(worker,iso);
+    const wasSame=current === status;
+    if(!wasSame && used >= limit){
+      alert(`No ${status} balance remaining.`);
+      return;
+    }
+  }
+
+  if(!worker.attendance) worker.attendance={};
+  worker.attendance[iso]=status;
+  saveData();
+  document.getElementById("pageContent").innerHTML=workerDetails(id);
+}
+
+/* ---------------- RECORDS ---------------- */
+
+function recordsPage(){
+  const active=activeWorkers();
+  return `
+    <div class="page-header"><div><h1>Records</h1><p>Search any active worker and open Monthly, Weekly or Yearly attendance.</p></div></div>
+    <div class="search-box"><span>🔎</span><input id="recordSearch" placeholder="Search worker, employee ID or department..." oninput="searchRecords()"></div>
+    <div id="recordsWorkerList" class="worker-list">${recordWorkerRows(active)}</div>
+  `;
+}
+
+function recordWorkerRows(list){
+  if(!list.length) return `<div class="empty-state"><div class="empty-icon">📋</div><strong>No workers found</strong><p>Try another search or add a worker.</p></div>`;
+  return list.map(worker=>`
+    <div class="record-worker-row" onclick="openWorker('${esc(worker.id)}')">
+      <div class="avatar">${initials(worker.name)}</div>
+      <div class="worker-main"><strong>${esc(worker.name)}</strong><span>${esc(worker.id)}${worker.department ? " • "+esc(worker.department):""}</span></div>
+      <div class="record-worker-type">${worker.type === "management" ? "Management" : "Labour"}</div>
+      <div class="row-arrow">›</div>
+    </div>
+  `).join("");
+}
+
+function searchRecords(){
+  const query=(document.getElementById("recordSearch")?.value || "").trim().toLowerCase();
+  const workers=activeWorkers().filter(w =>
+    String(w.name||"").toLowerCase().includes(query) ||
+    String(w.id||"").toLowerCase().includes(query) ||
+    String(w.department||"").toLowerCase().includes(query)
+  );
+  const list=document.getElementById("recordsWorkerList");
+  if(list) list.innerHTML=recordWorkerRows(workers);
+}
+
+/* ---------------- SETTINGS ---------------- */
+
+function settingsPage(){
+  return `
+    <div class="page-header"><div><h1>Settings</h1><p>Change office login credentials and manage local app data.</p></div></div>
+
+    <div class="settings-card">
+      <h2>Office Login</h2>
+      <p class="muted">These credentials are stored in this browser's local storage. No Gmail password is stored here.</p>
+      <div class="form-group"><label>Office ID</label><input id="officeIdInput" value="${esc(state.settings.officeId)}"></div>
+      <div class="form-group"><label>New Office Password</label><input id="officePasswordInput" type="password" placeholder="Leave blank to keep current password"></div>
+      <button class="btn primary" onclick="saveSettings()">Save Settings</button>
+    </div>
+
+    <div class="settings-card">
+      <h2>Google Account</h2>
+      <p class="muted">Current Google account: <b>${esc(sessionStorage.getItem("factory_google_email") || "Connected account")}</b></p>
+      <button class="btn secondary" onclick="restartGoogleLogin()">Switch Google Account</button>
+    </div>
+
+    <div class="settings-card danger-card">
+      <h2>Reset Application</h2>
+      <p class="muted">Deletes all workers and attendance records stored in this browser.</p>
+      <button class="btn danger" onclick="resetApplication()">Reset All Data</button>
+    </div>
+  `;
+}
+
+function saveSettings(){
+  const officeId=(document.getElementById("officeIdInput")?.value || "").trim();
+  const password=document.getElementById("officePasswordInput")?.value || "";
+  if(!officeId){alert("Office ID cannot be empty.");return;}
+  state.settings.officeId=officeId;
+  if(password) state.settings.officePassword=password;
+  saveData();
+  toast("Settings saved");
+  render();
+}
+
+function resetApplication(){
+  if(!confirm("Delete all workers and attendance records from this browser?")) return;
+  if(!confirm("This cannot be undone. Continue?")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.clear();
+  location.reload();
+}
+
+/* ---------------- WORKER MODAL ---------------- */
+
+function openWorkerModal(id=null,defaultType="labour"){
+  const worker=id ? getWorker(id) : null;
+  const type=worker?.type || defaultType;
+  const html=`
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header"><h2>${worker ? "Edit Worker" : "Add Worker"}</h2><button class="close-btn" onclick="closeModal()">×</button></div>
+        <div class="modal-body">
+          <div class="form-group"><label>Employee ID</label><input id="fId" value="${worker ? esc(worker.id):""}" placeholder="e.g. L001"></div>
+          <div class="form-group"><label>Name</label><input id="fName" value="${worker ? esc(worker.name):""}" placeholder="Worker name"></div>
+          <div class="form-group"><label>Department</label><input id="fDepartment" value="${worker ? esc(worker.department || ""):""}" placeholder="Department"></div>
+          <div class="form-group"><label>Worker Type</label><select id="fType"><option value="labour" ${type === "labour" ? "selected":""}>Labour</option><option value="management" ${type === "management" ? "selected":""}>Management</option></select></div>
+          <div class="form-group"><label>Monthly Salary</label><input id="fSalary" type="number" value="15000" readonly><small class="small">Fixed monthly salary: ₹15,000</small></div>
+          <div id="leaveFields" ${type === "management" ? "":"style=\"display:none\""}>
+            <div class="form-row">
+              <div class="form-group"><label>EL Limit</label><input id="fEL" type="number" min="0" value="${worker ? Number(worker.elLimit || 0):0}"></div>
+              <div class="form-group"><label>CL Limit</label><input id="fCL" type="number" min="0" value="${worker ? Number(worker.clLimit || 0):0}"></div>
+            </div>
+          </div>
+          <div class="form-group"><label>Password</label><input id="fPassword" type="password" placeholder="${worker ? "Leave blank to keep current password":"Worker login password"}"></div>
+        </div>
+        <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="saveWorkerForm('${worker ? esc(worker.id):""}')">${worker ? "Save Changes":"Add Worker"}</button></div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML("beforeend",html);
+  const select=document.getElementById("fType");
+  select?.addEventListener("change",()=>{
+    document.getElementById("leaveFields").style.display=select.value === "management" ? "block":"none";
+  });
+}
+
+function closeModal(){document.getElementById("modalOverlay")?.remove();}
+
+function saveWorkerForm(originalId=""){
+  const id=(document.getElementById("fId")?.value || "").trim();
+  const name=(document.getElementById("fName")?.value || "").trim();
+  const department=(document.getElementById("fDepartment")?.value || "").trim();
+  const type=document.getElementById("fType")?.value || "labour";
+  const password=document.getElementById("fPassword")?.value || "";
+  const elLimit=Math.max(0,Number(document.getElementById("fEL")?.value || 0));
+  const clLimit=Math.max(0,Number(document.getElementById("fCL")?.value || 0));
+
+  if(!id || !name){alert("Employee ID and Name are required.");return;}
+
+  const duplicate=state.workers.some(w => String(w.id).toLowerCase() === id.toLowerCase() && String(w.id).toLowerCase() !== String(originalId).toLowerCase());
+  if(duplicate){alert("Employee ID already exists.");return;}
+
+  if(originalId){
+    const worker=getWorker(originalId);
+    if(!worker){alert("Worker not found.");return;}
+    worker.id=id;
+    worker.name=name;
+    worker.department=department;
+    worker.type=type;
+    worker.salary=FIXED_SALARY;
+    worker.elLimit=type === "management" ? elLimit:0;
+    worker.clLimit=type === "management" ? clLimit:0;
+    if(password.trim()) worker.password=password.trim();
+    ensureWorkerShape(worker);
+    saveData();
+    closeModal();
+    if(selectedWorker === originalId) selectedWorker=worker.id;
+    document.getElementById("pageContent").innerHTML=workerDetails(worker.id);
+    toast("Worker updated");
+    return;
+  }
+
+  if(!password.trim()){alert("Please create a worker password.");return;}
+
+  const worker={
+    id,name,department,type,salary:FIXED_SALARY,password:password.trim(),active:true,
+    createdAt:new Date().toISOString(),attendance:{},leaveUsed:{EL:0,CL:0},
+    elLimit:type === "management" ? elLimit:0,
+    clLimit:type === "management" ? clLimit:0
+  };
+  state.workers.push(worker);
+  saveData();
+  closeModal();
+  currentPage=type;
+  render();
+  toast("Worker added successfully");
+}
+
+function archiveWorker(id){
+  const worker=getWorker(id);
+  if(!worker) return;
+  if(!confirm(`Archive ${worker.name}? Their attendance and salary records will be preserved.`)) return;
+  worker.active=false;
+  saveData();
+  selectedWorker=null;
+  currentPage=worker.type;
+  render();
+  toast("Worker archived");
+}
+
+/* ---------------- WORKER DASHBOARD ---------------- */
+
+function workerDashboard(){
+  const worker=getWorker(session.workerId);
+  if(!worker){logout();return "";}
+  const today=todayISO();
+  const ym=today.slice(0,7);
+  const status=getStatus(worker,today);
+  const leave=leaveStats(worker,ym);
+  const salary=salaryCalculation(worker,ym);
+
+  return `
+    <div class="page-header">
+      <div><h1>Welcome, ${esc(worker.name)}</h1><p>${esc(worker.id)} • ${worker.type === "management" ? "Management":"Labour"}${worker.department ? " • "+esc(worker.department):""}</p></div>
+      <button class="btn secondary" onclick="logout()">Logout</button>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card"><span>Current Monthly Salary</span><strong>${formatCurrency(salary)}</strong></div>
+      <div class="summary-card"><span>Today</span><strong>${status === "P" ? "Present" : status === "A" ? "Absent" : status === "EL" ? "EL" : status === "CL" ? "CL" : status === "WO" ? "Weekly Off":"Not Marked"}</strong></div>
+      ${worker.type === "management" ? `
+        <div class="summary-card"><span>EL Balance</span><strong>${Math.max(0,Number(worker.elLimit||0)-leave.EL)}</strong></div>
+        <div class="summary-card"><span>CL Balance</span><strong>${Math.max(0,Number(worker.clLimit||0)-leave.CL)}</strong></div>
+      ` : `
+        <div class="summary-card"><span>Month Absent</span><strong>${countAbsences(worker,monthBounds(ym).start,monthBounds(ym).end)}</strong></div>
+        <div class="summary-card"><span>Base Salary</span><strong>${formatCurrency(FIXED_SALARY)}</strong></div>
+      `}
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div><h2>Today's Attendance</h2><p>${formatDate(today)}</p></div></div>
+      ${isSunday(parseDate(today)) ? `<div class="weekly-off">🟢 Sunday • Weekly Off</div>` : `
+        <div class="attendance-actions">
+          <button class="attendance-btn present ${status === "P" ? "active":""}" onclick="workerSetToday('P')">P</button>
+          <button class="attendance-btn absent ${status === "A" ? "active":""}" onclick="workerSetToday('A')">A</button>
+          ${worker.type === "management" ? `
+            <button class="attendance-btn el ${status === "EL" ? "active":""}" onclick="workerSetToday('EL')">EL</button>
+            <button class="attendance-btn cl ${status === "CL" ? "active":""}" onclick="workerSetToday('CL')">CL</button>
+          ` : ""}
+        </div>
+      `}
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div><h2>Current Month</h2><p>${monthName(ym)}</p></div></div>
+      ${workerReadOnlyTable(worker,ym)}
+    </div>
+  `;
+}
+
+function workerReadOnlyTable(worker,ym){
+  const b=monthBounds(ym);
+  return `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Day</th><th>Status</th><th>Effect</th></tr></thead><tbody>${datesBetween(b.start,b.end).map(d=>{
+    const iso=isoDate(d),status=getStatus(worker,iso);
+    const effect=status === "A" && !isSunday(d) ? "Deduction" : status === "EL" || status === "CL" ? "Paid leave" : "No deduction";
+    return `<tr><td>${formatDate(iso)}</td><td>${d.toLocaleDateString("en-IN",{weekday:"short"})}</td><td>${statusHTML(status)}</td><td>${effect}</td></tr>`;
+  }).join("")}</tbody></table></div>`;
+}
+
+function workerSetToday(status){
+  const worker=getWorker(session.workerId);
+  if(!worker) return;
+  const today=todayISO();
+  if(isSunday(parseDate(today))){alert("Sunday is a weekly off.");return;}
+  if((status === "EL" || status === "CL") && worker.type !== "management"){alert("EL/CL is available only for Management.");return;}
+
+  if(status === "EL" || status === "CL"){
+    const used=leaveStats(worker,today.slice(0,7))[status];
+    const limit=Number(worker[status === "EL" ? "elLimit":"clLimit"] || 0);
+    const old=getStatus(worker,today);
+    if(old !== status && used >= limit){alert(`No ${status} balance remaining.`);return;}
+  }
+
+  if(!worker.attendance) worker.attendance={};
+  worker.attendance[today]=status;
+  saveData();
+  render();
+}
+
+/* ---------------- LOGOUT / TOAST ---------------- */
+
+function logout(){
+  session={loggedIn:false,role:null,workerId:null};
+  sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(GOOGLE_SESSION_KEY);
+  sessionStorage.removeItem("factory_google_email");
+  sessionStorage.removeItem("factory_google_signin_time");
+  currentPage="dashboard";
+  selectedWorker=null;
+  if(window.google?.accounts?.id){
+    try{google.accounts.id.disableAutoSelect();}catch{}
+  }
+  showGoogleScreen();
+}
+
+let toastTimer=null;
+function toast(message){
+  const el=document.getElementById("toast");
+  if(!el) return;
+  el.textContent=message;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove("show"),2600);
+}
+
+document.addEventListener("click",event=>{
+  if(event.target?.id === "modalOverlay") closeModal();
+});
+
+/* ---------------- START ---------------- */
+render();
+</script>
+
+</body>
+</html>
