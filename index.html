@@ -80,6 +80,12 @@ button{cursor:pointer}
 .auth-tabs{display:grid;grid-template-columns:1fr 1fr;background:#f3f4f6;border-radius:12px;padding:4px;margin-bottom:24px}
 .auth-tab{border:0;background:transparent;padding:10px;border-radius:9px;font-weight:700;color:#6b7280}
 .auth-tab.active{background:#fff;color:#111827;box-shadow:0 2px 7px rgba(15,23,42,.08)}
+.access-choice-grid{display:grid;gap:12px}
+.access-choice{width:100%;border:1px solid var(--line);background:#fff;border-radius:15px;padding:17px;text-align:left;display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:3px;transition:.15s}
+.access-choice:hover{border-color:#93c5fd;box-shadow:0 5px 18px rgba(15,23,42,.06);transform:translateY(-1px)}
+.access-choice strong{font-size:15px;align-self:end}
+.access-choice span:last-child{grid-column:2;color:var(--muted);font-size:12px}
+.access-icon{grid-row:1 / span 2;font-size:25px;align-self:center}
 
 .form-group{margin-bottom:16px}
 .form-group label{display:block;font-size:13px;font-weight:700;margin-bottom:7px}
@@ -248,6 +254,9 @@ tr:last-child td{border-bottom:0}
 
 <!-- Google Identity Services. The button is initialized by our script below. -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
 
 <div id="root"></div>
 <div id="toast" class="toast"></div>
@@ -258,28 +267,67 @@ tr:last-child td{border-bottom:0}
    Single-file app: Google Sign-In -> Office/Worker Login -> App
    ========================================================= */
 
-const STORAGE_KEY = "factory_attendance_v6";
-const SESSION_KEY = "factory_attendance_session_v6";
-const GOOGLE_SESSION_KEY = "factory_google_session_v6";
+const STORAGE_KEY = "factory_attendance_v8";
+const SESSION_KEY = "factory_attendance_session_v8";
+const GOOGLE_SESSION_KEY = "factory_google_session_v8";
 const FIXED_SALARY = 15000;
 const GOOGLE_CLIENT_ID = "43409647151-pprbk4thfoem6svhib5vg3vbn9hkbh73.apps.googleusercontent.com";
+
+const FIREBASE_CONFIG = {
+  apiKey: "PASTE_FIREBASE_API_KEY",
+  authDomain: "PASTE_FIREBASE_PROJECT_ID.firebaseapp.com",
+  projectId: "PASTE_FIREBASE_PROJECT_ID",
+  storageBucket: "PASTE_FIREBASE_PROJECT_ID.firebasestorage.app",
+  messagingSenderId: "PASTE_FIREBASE_MESSAGING_SENDER_ID",
+  appId: "PASTE_FIREBASE_APP_ID"
+};
 
 let currentPage = "dashboard";
 let selectedWorker = null;
 let recordMode = "monthly";
 let recordDate = new Date();
-let authMode = "office";
+let authMode = "officeLogin";
+let officeAccessMode = "choice";
 let googleInitialized = false;
+let firebaseApp = null;
+let firebaseAuth = null;
+let firestoreDb = null;
+let cloudOfficeUser = null;
+let cloudStateHydrated = false;
+let cloudSaveTimer = null;
+
+function isFirebaseConfigured(){
+  return Object.values(FIREBASE_CONFIG).every(value =>
+    String(value || "").trim() && !String(value).includes("PASTE_FIREBASE_")
+  );
+}
+
+function initFirebase(){
+  if(!isFirebaseConfigured()){
+    console.warn("Firebase not configured. Local fallback mode is active.");
+    return false;
+  }
+  try{
+    firebaseApp=firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
+    firebaseAuth=firebase.auth();
+    firestoreDb=firebase.firestore();
+    return true;
+  }catch(error){
+    console.error("Firebase initialization failed",error);
+    return false;
+  }
+}
+
+const firebaseReady=initFirebase();
 
 let state = loadState();
 let session = loadSession();
 
 function defaultState(){
   return {
-    version: 7,
+    version: 8,
     settings: {
       officeId: "",
-      officePassword: "",
       officeSetupComplete: false
     },
     workers: []
@@ -288,29 +336,24 @@ function defaultState(){
 
 function loadState(){
   try{
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw=localStorage.getItem(STORAGE_KEY)||localStorage.getItem("factory_attendance_v7")||localStorage.getItem("factory_attendance_v6");
     if(!raw) return defaultState();
 
-    const parsed = JSON.parse(raw);
-    const base = defaultState();
-    const settings = {...base.settings, ...(parsed.settings || {})};
-
-    // Migration for older builds that used admin/admin123 by default.
-    // Existing custom credentials stay configured; the old default pair
-    // is treated as "not set up yet" so the owner can create their own.
-    if(typeof settings.officeSetupComplete !== "boolean"){
-      settings.officeSetupComplete = !(
-        String(settings.officeId || "") === "admin" &&
-        String(settings.officePassword || "") === "admin123"
-      );
-    }
+    const parsed=JSON.parse(raw);
+    const base=defaultState();
+    const settings={...base.settings,...(parsed.settings||{})};
+    delete settings.officePassword;
 
     return {
       ...base,
       ...parsed,
-      version: 7,
-      settings,
-      workers: Array.isArray(parsed.workers) ? parsed.workers : []
+      version:8,
+      settings:{
+        ...base.settings,
+        ...settings,
+        officeSetupComplete:String(settings.officeId||"").trim()!==""
+      },
+      workers:Array.isArray(parsed.workers)?parsed.workers:[]
     };
   }catch(error){
     console.error(error);
@@ -318,398 +361,98 @@ function loadState(){
   }
 }
 
-function saveData(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+function cloudStatePayload(){
+  const payload=JSON.parse(JSON.stringify(state));
+  payload.version=8;
+  payload.settings={
+    officeId:String(payload.settings?.officeId||"").trim(),
+    officeSetupComplete:true
+  };
+  delete payload.settings.officePassword;
+  return payload;
 }
 
-function loadSession(){
+function scheduleCloudSave(){
+  if(!firebaseReady||!cloudOfficeUser||!cloudStateHydrated) return;
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer=setTimeout(saveStateToCloud,500);
+}
+
+async function saveStateToCloud(){
+  if(!firebaseReady||!firestoreDb||!cloudOfficeUser||!cloudStateHydrated) return;
   try{
-    return JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null") || {
-      loggedIn:false, role:null, workerId:null
-    };
-  }catch{
-    return {loggedIn:false, role:null, workerId:null};
+    await firestoreDb.collection("offices").doc(cloudOfficeUser.uid).set({
+      officeId:state.settings.officeId,
+      state:cloudStatePayload(),
+      googleEmail:sessionStorage.getItem("factory_google_email")||"",
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    },{merge:true});
+  }catch(error){
+    console.error("Cloud save failed",error);
+    toast("Saved locally, but cloud sync failed.");
   }
 }
 
-function saveSession(){
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+function saveData(){
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+  scheduleCloudSave();
 }
 
 function isOfficeSetupComplete(){
-  return state.settings?.officeSetupComplete === true &&
-    String(state.settings.officeId || "").trim() !== "" &&
-    String(state.settings.officePassword || "") !== "";
+  return String(state.settings?.officeId||"").trim()!=="";
 }
 
-function showOfficeSetupScreen(){
-  document.getElementById("root").innerHTML = `
-    <div class="login-screen">
-      <div class="login-card">
-        <div class="brand-mark">FA</div>
-        <h1>Create Office Account</h1>
-        <p class="subtitle">Set the Office ID and password you'll use to enter the admin dashboard.</p>
-
-        <div class="form-group">
-          <label>Office ID</label>
-          <input id="setupOfficeId" autocomplete="username" placeholder="e.g. myfactory">
-        </div>
-
-        <div class="form-group">
-          <label>Office Password</label>
-          <input id="setupOfficePassword" type="password" autocomplete="new-password" placeholder="Create a password">
-        </div>
-
-        <div class="form-group">
-          <label>Confirm Password</label>
-          <input id="setupOfficePasswordConfirm" type="password" autocomplete="new-password" placeholder="Re-enter password">
-        </div>
-
-        <button class="btn primary full" onclick="completeOfficeSetup()">Create Office Account</button>
-        <p class="small" style="margin:13px 0 0;text-align:center">
-          These credentials are saved in this browser and can be changed later from Settings.
-        </p>
-      </div>
-    </div>
-  `;
+function normalizedOfficeId(id){
+  return String(id||"").trim().toLowerCase();
 }
 
-function completeOfficeSetup(){
-  const id=(document.getElementById("setupOfficeId")?.value || "").trim();
-  const password=document.getElementById("setupOfficePassword")?.value || "";
-  const confirmPassword=document.getElementById("setupOfficePasswordConfirm")?.value || "";
-
-  if(id.length < 3){
-    alert("Office ID must be at least 3 characters.");
-    return;
-  }
-
-  if(password.length < 6){
-    alert("Office password must be at least 6 characters.");
-    return;
-  }
-
-  if(password !== confirmPassword){
-    alert("Passwords do not match.");
-    return;
-  }
-
-  state.settings.officeId=id;
-  state.settings.officePassword=password;
-  state.settings.officeSetupComplete=true;
-  saveData();
-
-  authMode="office";
-  toast("Office account created successfully");
-  showLogin();
+function validateOfficeId(id){
+  return /^[a-z0-9][a-z0-9._-]{2,29}$/i.test(String(id||"").trim());
 }
 
-function esc(value){
-  return String(value ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
+function officeAuthEmail(id){
+  return "office."+normalizedOfficeId(id).replace(/[^a-z0-9._-]/g,"_")+"@factory-attendance.local";
 }
 
-function initials(name){
-  const parts = String(name || "?").trim().split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] || "?") + (parts[1]?.[0] || "")).toUpperCase();
+function cloudStatusHTML(){
+  return firebaseReady
+    ? `<div class="small" style="text-align:center;margin-top:14px;color:#15803d">☁️ Online account & data sync enabled</div>`
+    : `<div class="small" style="text-align:center;margin-top:14px;color:#b45309">⚠️ Firebase is not connected. Cross-device Office accounts need Firebase configuration.</div>`;
 }
-
-function pad(n){ return String(n).padStart(2,"0"); }
-
-function isoDate(date){
-  const d = new Date(date);
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-}
-
-function parseDate(iso){
-  const [y,m,d] = String(iso).split("-").map(Number);
-  return new Date(y,m-1,d);
-}
-
-function todayISO(){ return isoDate(new Date()); }
-
-function isSunday(date){ return date.getDay() === 0; }
-
-function monthBounds(ym){
-  const [y,m] = String(ym).split("-").map(Number);
-  return {
-    start:new Date(y,m-1,1),
-    end:new Date(y,m,0)
-  };
-}
-
-function datesBetween(start,end){
-  const out=[];
-  const d=new Date(start);
-  d.setHours(0,0,0,0);
-  const last=new Date(end);
-  last.setHours(0,0,0,0);
-  while(d<=last){
-    out.push(new Date(d));
-    d.setDate(d.getDate()+1);
-  }
-  return out;
-}
-
-function monthName(ym){
-  const [y,m] = String(ym).split("-").map(Number);
-  return new Date(y,m-1,1).toLocaleDateString("en-IN",{month:"long",year:"numeric"});
-}
-
-function formatDate(iso){
-  return parseDate(iso).toLocaleDateString("en-IN",{
-    day:"2-digit",month:"short",year:"numeric"
-  });
-}
-
-function formatCurrency(value){
-  return `₹${Math.round(Number(value)||0).toLocaleString("en-IN")}`;
-}
-
-function getWorker(id){
-  return state.workers.find(w => String(w.id) === String(id));
-}
-
-function activeWorkers(type=null){
-  return state.workers.filter(w => w.active !== false && (!type || w.type === type));
-}
-
-function allWorkers(type=null){
-  return state.workers.filter(w => !type || w.type === type);
-}
-
-function ensureWorkerShape(worker){
-  if(!worker.attendance) worker.attendance={};
-  if(!worker.leaveUsed) worker.leaveUsed={EL:0,CL:0};
-  if(typeof worker.elLimit !== "number") worker.elLimit=Number(worker.elLimit||0);
-  if(typeof worker.clLimit !== "number") worker.clLimit=Number(worker.clLimit||0);
-  if(worker.salary !== FIXED_SALARY) worker.salary=FIXED_SALARY;
-  if(worker.active === undefined) worker.active=true;
-}
-
-function getStatus(worker, iso){
-  if(!worker) return "-";
-  if(isSunday(parseDate(iso))) return "WO";
-  return worker.attendance?.[iso] || "-";
-}
-
-function countWorkingDays(start,end){
-  return datesBetween(start,end).filter(d => !isSunday(d)).length;
-}
-
-function countAbsences(worker,start,end){
-  return datesBetween(start,end).filter(d => {
-    if(isSunday(d)) return false;
-    return getStatus(worker,isoDate(d)) === "A";
-  }).length;
-}
-
-function salaryCalculation(worker, ym){
-  if(!worker) return 0;
-  ensureWorkerShape(worker);
-  const bounds = monthBounds(ym);
-  const workingDays = countWorkingDays(bounds.start,bounds.end);
-  const absentDays = countAbsences(worker,bounds.start,bounds.end);
-  if(workingDays <= 0) return FIXED_SALARY;
-  const deduction = (FIXED_SALARY / workingDays) * absentDays;
-  return Math.max(0,Math.round(FIXED_SALARY - deduction));
-}
-
-function leaveStats(worker,ym){
-  if(!worker) return {EL:0,CL:0};
-  const bounds=monthBounds(ym);
-  const stats={EL:0,CL:0};
-  datesBetween(bounds.start,bounds.end).forEach(d=>{
-    const status=getStatus(worker,isoDate(d));
-    if(status === "EL") stats.EL++;
-    if(status === "CL") stats.CL++;
-  });
-  return stats;
-}
-
-function statusHTML(status){
-  const labels={P:"Present",A:"Absent",EL:"EL",CL:"CL",WO:"Weekly Off","-":"Not Marked"};
-  const cls=status === "P" ? "status-P" :
-    status === "A" ? "status-A" :
-    status === "EL" ? "status-EL" :
-    status === "CL" ? "status-CL" :
-    status === "WO" ? "status-WO" : "status-empty";
-  return `<span class="status-badge ${cls}">${labels[status] || status}</span>`;
-}
-
-function periodForMode(worker,mode,baseDate){
-  const d=new Date(baseDate);
-  d.setHours(0,0,0,0);
-
-  if(mode === "monthly"){
-    const ym=`${d.getFullYear()}-${pad(d.getMonth()+1)}`;
-    const b=monthBounds(ym);
-    return {start:b.start,end:b.end,label:monthName(ym),key:ym};
-  }
-
-  if(mode === "yearly"){
-    const y=d.getFullYear();
-    return {
-      start:new Date(y,0,1),
-      end:new Date(y,11,31),
-      label:String(y),
-      key:String(y)
-    };
-  }
-
-  const day=d.getDay();
-  const mondayOffset=day === 0 ? -6 : 1-day;
-  const start=new Date(d);
-  start.setDate(d.getDate()+mondayOffset);
-  const end=new Date(start);
-  end.setDate(start.getDate()+6);
-  return {
-    start,
-    end,
-    label:`${start.toLocaleDateString("en-IN",{day:"2-digit",month:"short"})} - ${end.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}`,
-    key:isoDate(start)
-  };
-}
-
-function periodSummary(worker,mode,baseDate){
-  const p=periodForMode(worker,mode,baseDate);
-  let working=0,present=0,absent=0,EL=0,CL=0,WO=0;
-  datesBetween(p.start,p.end).forEach(d=>{
-    const iso=isoDate(d);
-    const status=getStatus(worker,iso);
-    if(isSunday(d)){ WO++; return; }
-    working++;
-    if(status === "P") present++;
-    if(status === "A") absent++;
-    if(status === "EL") EL++;
-    if(status === "CL") CL++;
-  });
-  const salary = mode === "monthly" ? salaryCalculation(worker,p.key) :
-    Math.max(0,Math.round(FIXED_SALARY - ((FIXED_SALARY / Math.max(1,working)) * absent)));
-  return {...p,working,present,absent,EL,CL,WO,salary};
-}
-
-/* ---------------- GOOGLE ---------------- */
-
-function hasGoogleSession(){
-  return sessionStorage.getItem(GOOGLE_SESSION_KEY) === "1";
-}
-
-function showGoogleScreen(){
-  document.getElementById("root").innerHTML = `
-    <div class="login-screen">
-      <div class="login-card">
-        <div class="brand-mark">FA</div>
-        <h1>Factory Attendance</h1>
-        <p class="subtitle">Attendance • Leave • Salary Records</p>
-
-        <div class="google-stage">
-          <div class="google-title">Continue with Google</div>
-          <div class="google-copy">Sign in with your Google account before entering the office system.</div>
-          <div id="googleButton"></div>
-          <div id="googleStatus" class="google-status"></div>
-        </div>
-      </div>
-    </div>
-  `;
-  initGoogleButton();
-}
-
-function initGoogleButton(){
-  const target=document.getElementById("googleButton");
-  if(!target) return;
-
-  if(!window.google || !window.google.accounts || !window.google.accounts.id){
-    setTimeout(initGoogleButton,400);
-    return;
-  }
-
-  if(!googleInitialized){
-    google.accounts.id.initialize({
-      client_id:GOOGLE_CLIENT_ID,
-      callback:handleGoogleCredential,
-      auto_select:false,
-      use_fedcm_for_prompt:true
-    });
-    googleInitialized=true;
-  }
-
-  target.innerHTML="";
-  google.accounts.id.renderButton(target,{
-    theme:"outline",
-    size:"large",
-    width:320,
-    text:"continue_with",
-    shape:"rectangular",
-    logo_alignment:"left"
-  });
-}
-
-function handleGoogleCredential(response){
-  if(!response || !response.credential){
-    setGoogleStatus("Google sign-in did not return a credential. Please try again.");
-    return;
-  }
-
-  sessionStorage.setItem(GOOGLE_SESSION_KEY,"1");
-  sessionStorage.setItem("factory_google_signin_time",new Date().toISOString());
-
-  let email="";
-  try{
-    const payload=decodeJwtPayload(response.credential);
-    email=payload?.email || "";
-    if(email) sessionStorage.setItem("factory_google_email",email);
-  }catch(error){
-    console.warn("Could not read Google profile payload",error);
-  }
-
-  showLogin();
-  toast(email ? `Google account connected: ${email}` : "Google account connected");
-}
-
-function decodeJwtPayload(jwt){
-  const part=String(jwt).split(".")[1];
-  if(!part) return null;
-  const normalized=part.replaceAll("-","+").replaceAll("_","/");
-  const json=decodeURIComponent(atob(normalized).split("").map(c=>"%"+c.charCodeAt(0).toString(16).padStart(2,"0")).join(""));
-  return JSON.parse(json);
-}
-
-function setGoogleStatus(message){
-  const el=document.getElementById("googleStatus");
-  if(el) el.textContent=message;
-}
-
-/* ---------------- LOGIN SCREEN ---------------- */
 
 function showLogin(){
   if(!hasGoogleSession()){
     showGoogleScreen();
     return;
   }
+  showOfficeAccessChooser();
+}
 
-  if(!isOfficeSetupComplete()){
-    showOfficeSetupScreen();
-    return;
-  }
-
-  document.getElementById("root").innerHTML = `
+function showOfficeAccessChooser(){
+  officeAccessMode="choice";
+  document.getElementById("root").innerHTML=`
     <div class="login-screen">
       <div class="login-card">
         <div class="brand-mark">FA</div>
         <h1>Office Access</h1>
-        <p class="subtitle">Google account connected. Choose your access type.</p>
+        <p class="subtitle">Google account connected. Choose your office access.</p>
 
-        <div class="auth-tabs">
-          <button id="officeTab" class="auth-tab ${authMode === "office" ? "active" : ""}" onclick="switchAuthMode('office')">Office</button>
-          <button id="workerTab" class="auth-tab ${authMode === "worker" ? "active" : ""}" onclick="switchAuthMode('worker')">Worker</button>
+        <div class="access-choice-grid">
+          <button class="access-choice" onclick="showCreateOfficeAccount()">
+            <span class="access-icon">🆕</span>
+            <strong>Create New Office Account</strong>
+            <span>Create the factory's shared Office ID and password.</span>
+          </button>
+          <button class="access-choice" onclick="showExistingOfficeLogin()">
+            <span class="access-icon">🔑</span>
+            <strong>Already Have an Account</strong>
+            <span>Use the same Office ID and password from any device.</span>
+          </button>
         </div>
 
-        <div id="officeFormWrap"></div>
+        <div class="login-divider"><span>or</span></div>
+        <button class="btn secondary full" onclick="showWorkerLogin()">👷 Worker Login</button>
+        ${cloudStatusHTML()}
 
         <div style="margin-top:18px;text-align:center">
           <button class="btn secondary" onclick="restartGoogleLogin()">Use another Google account</button>
@@ -717,70 +460,239 @@ function showLogin(){
       </div>
     </div>
   `;
-
-  renderAuthForm();
 }
 
-function switchAuthMode(mode){
-  authMode=mode;
-  renderAuthForm();
-  document.getElementById("officeTab")?.classList.toggle("active",mode === "office");
-  document.getElementById("workerTab")?.classList.toggle("active",mode === "worker");
+function showCreateOfficeAccount(){
+  officeAccessMode="create";
+  document.getElementById("root").innerHTML=`
+    <div class="login-screen">
+      <div class="login-card">
+        <div class="brand-mark">FA</div>
+        <h1>Create Office Account</h1>
+        <p class="subtitle">One account, usable on every device.</p>
+
+        <div class="form-group">
+          <label>Office ID</label>
+          <input id="createOfficeId" autocomplete="username" placeholder="e.g. myfactory">
+          <div class="small" style="margin-top:6px">3–30 characters: letters, numbers, dot, underscore or hyphen.</div>
+        </div>
+        <div class="form-group">
+          <label>Office Password</label>
+          <input id="createOfficePassword" type="password" autocomplete="new-password" placeholder="Create a password">
+        </div>
+        <div class="form-group">
+          <label>Confirm Password</label>
+          <input id="createOfficePasswordConfirm" type="password" autocomplete="new-password" placeholder="Re-enter password">
+        </div>
+
+        <button class="btn primary full" onclick="createOfficeAccount()">Create Account</button>
+        <button class="btn secondary full" style="margin-top:10px" onclick="showOfficeAccessChooser()">Back</button>
+        ${cloudStatusHTML()}
+      </div>
+    </div>
+  `;
 }
 
-function renderAuthForm(){
-  const wrap=document.getElementById("officeFormWrap");
-  if(!wrap) return;
+function showExistingOfficeLogin(){
+  officeAccessMode="login";
+  document.getElementById("root").innerHTML=`
+    <div class="login-screen">
+      <div class="login-card">
+        <div class="brand-mark">FA</div>
+        <h1>Already Have an Account?</h1>
+        <p class="subtitle">Enter the same Office ID and password used on your other devices.</p>
 
-  if(authMode === "office"){
-    wrap.innerHTML=`
-      <div class="form-group">
-        <label>Office ID</label>
-        <input id="officeLoginId" autocomplete="username" placeholder="Office ID" value="">
+        <div class="form-group">
+          <label>Office ID</label>
+          <input id="officeLoginId" autocomplete="username" placeholder="Office ID">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input id="officeLoginPassword" type="password" autocomplete="current-password" placeholder="Office password" onkeydown="if(event.key==='Enter') officeLogin()">
+        </div>
+
+        <button class="btn primary full" onclick="officeLogin()">Login to Office</button>
+        <button class="btn secondary full" style="margin-top:10px" onclick="showOfficeAccessChooser()">Back</button>
+        ${cloudStatusHTML()}
       </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input id="officeLoginPassword" type="password" autocomplete="current-password" placeholder="Password">
+    </div>
+  `;
+}
+
+function showWorkerLogin(){
+  authMode="worker";
+  document.getElementById("root").innerHTML=`
+    <div class="login-screen">
+      <div class="login-card">
+        <div class="brand-mark">FA</div>
+        <h1>Worker Login</h1>
+        <p class="subtitle">Use the Employee ID and password given by the office admin.</p>
+        <div class="form-group">
+          <label>Employee ID</label>
+          <input id="workerLoginId" autocomplete="username" placeholder="e.g. L001">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input id="workerLoginPassword" type="password" autocomplete="current-password" placeholder="Worker password" onkeydown="if(event.key==='Enter') workerLogin()">
+        </div>
+        <button class="btn primary full" onclick="workerLogin()">Worker Login</button>
+        <button class="btn secondary full" style="margin-top:10px" onclick="showOfficeAccessChooser()">Back to Office Access</button>
       </div>
-      <button class="btn primary full" onclick="officeLogin()">Login to Office</button>
-      <p class="small" style="text-align:center;margin:13px 0 0">Use the Office ID and password created during setup.</p>
-    `;
-  }else{
-    wrap.innerHTML=`
-      <div class="form-group">
-        <label>Employee ID</label>
-        <input id="workerLoginId" autocomplete="username" placeholder="e.g. L001">
-      </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input id="workerLoginPassword" type="password" autocomplete="current-password" placeholder="Worker password">
-      </div>
-      <button class="btn primary full" onclick="workerLogin()">Worker Login</button>
-      <p class="small" style="text-align:center;margin:13px 0 0">Use the Employee ID and password given by office admin.</p>
-    `;
+    </div>
+  `;
+}
+
+async function hydrateCloudState(user,requestedOfficeId){
+  const snap=await firestoreDb.collection("offices").doc(user.uid).get();
+  if(!snap.exists) throw new Error("This office account has no factory record yet.");
+
+  const data=snap.data()||{};
+  const remoteState=data.state||defaultState();
+  const base=defaultState();
+
+  state={
+    ...base,
+    ...remoteState,
+    version:8,
+    settings:{
+      ...base.settings,
+      ...(remoteState.settings||{}),
+      officeId:normalizedOfficeId(data.officeId||remoteState.settings?.officeId||requestedOfficeId),
+      officeSetupComplete:true
+    },
+    workers:Array.isArray(remoteState.workers)?remoteState.workers:[]
+  };
+
+  delete state.settings.officePassword;
+  state.workers.forEach(ensureWorkerShape);
+  cloudOfficeUser=user;
+  cloudStateHydrated=true;
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+}
+
+async function createOfficeAccount(){
+  const id=(document.getElementById("createOfficeId")?.value||"").trim();
+  const password=document.getElementById("createOfficePassword")?.value||"";
+  const confirmPassword=document.getElementById("createOfficePasswordConfirm")?.value||"";
+
+  if(!validateOfficeId(id)){
+    alert("Office ID must be 3–30 characters and use only letters, numbers, dot, underscore or hyphen.");
+    return;
   }
+  if(password.length<6){
+    alert("Office password must be at least 6 characters.");
+    return;
+  }
+  if(password!==confirmPassword){
+    alert("Passwords do not match.");
+    return;
+  }
+
+  const normalizedId=normalizedOfficeId(id);
+
+  if(firebaseReady){
+    try{
+      const credential=await firebaseAuth.createUserWithEmailAndPassword(officeAuthEmail(normalizedId),password);
+      state.settings.officeId=normalizedId;
+      state.settings.officeSetupComplete=true;
+      delete state.settings.officePassword;
+
+      cloudOfficeUser=credential.user;
+      cloudStateHydrated=true;
+
+      await firestoreDb.collection("offices").doc(credential.user.uid).set({
+        officeId:normalizedId,
+        state:cloudStatePayload(),
+        googleEmail:sessionStorage.getItem("factory_google_email")||"",
+        createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      saveData();
+      session={loggedIn:true,role:"admin",workerId:null};
+      saveSession();
+      currentPage="dashboard";
+      render();
+      toast("Office account created. Cloud sync is ON ☁️");
+    }catch(error){
+      console.error(error);
+      alert(error?.code==="auth/email-already-in-use"
+        ? "That Office ID already exists. Use 'Already Have an Account' to log in."
+        : (error?.message||"Could not create the office account."));
+    }
+    return;
+  }
+
+  state.settings.officeId=normalizedId;
+  state.settings.officeSetupComplete=true;
+  state.settings.officePassword=password;
+  saveData();
+  session={loggedIn:true,role:"admin",workerId:null};
+  saveSession();
+  currentPage="dashboard";
+  render();
+  alert("Created on this device only. Add Firebase configuration to make the same account work on every device.");
 }
 
-function officeLogin(){
-  const id=(document.getElementById("officeLoginId")?.value || "").trim();
-  const password=document.getElementById("officeLoginPassword")?.value || "";
+async function officeLogin(){
+  const id=(document.getElementById("officeLoginId")?.value||"").trim();
+  const password=document.getElementById("officeLoginPassword")?.value||"";
 
-  if(id === state.settings.officeId && password === state.settings.officePassword){
+  if(!validateOfficeId(id)){
+    alert("Enter a valid Office ID.");
+    return;
+  }
+  if(!password){
+    alert("Enter the Office password.");
+    return;
+  }
+
+  const normalizedId=normalizedOfficeId(id);
+
+  if(firebaseReady){
+    try{
+      const credential=await firebaseAuth.signInWithEmailAndPassword(officeAuthEmail(normalizedId),password);
+      await hydrateCloudState(credential.user,normalizedId);
+      session={loggedIn:true,role:"admin",workerId:null};
+      saveSession();
+      currentPage="dashboard";
+      render();
+      toast("Office account connected ☁️");
+    }catch(error){
+      console.error(error);
+      const code=error?.code||"";
+      alert(code==="auth/invalid-credential"||code==="auth/wrong-password"||code==="auth/user-not-found"
+        ? "Invalid Office ID or Password."
+        : (error?.message||"Could not connect to the office account."));
+    }
+    return;
+  }
+
+  if(normalizedId===normalizedOfficeId(state.settings.officeId)&&password===state.settings.officePassword){
     session={loggedIn:true,role:"admin",workerId:null};
     saveSession();
     currentPage="dashboard";
     render();
   }else{
-    alert("Invalid Office ID or Password.");
+    alert("Invalid Office ID or Password. Firebase is not configured, so only this device can verify the account.");
   }
 }
 
-function workerLogin(){
-  const id=(document.getElementById("workerLoginId")?.value || "").trim();
-  const password=document.getElementById("workerLoginPassword")?.value || "";
-  const worker=state.workers.find(w => String(w.id).toLowerCase() === id.toLowerCase() && w.active !== false);
+function renderAuthForm(){
+  authMode==="worker" ? showWorkerLogin() : showExistingOfficeLogin();
+}
 
-  if(worker && worker.password === password){
+function switchAuthMode(mode){
+  authMode=mode;
+  renderAuthForm();
+}
+
+function workerLogin(){
+  const id=(document.getElementById("workerLoginId")?.value||"").trim();
+  const password=document.getElementById("workerLoginPassword")?.value||"";
+  const worker=state.workers.find(w=>String(w.id).toLowerCase()===id.toLowerCase()&&w.active!==false);
+
+  if(worker&&worker.password===password){
     ensureWorkerShape(worker);
     saveData();
     session={loggedIn:true,role:"worker",workerId:worker.id};
@@ -792,13 +704,22 @@ function workerLogin(){
   }
 }
 
-function restartGoogleLogin(){
+async function restartGoogleLogin(){
   sessionStorage.removeItem(GOOGLE_SESSION_KEY);
   sessionStorage.removeItem("factory_google_email");
   session={loggedIn:false,role:null,workerId:null};
   sessionStorage.removeItem(SESSION_KEY);
+
+  clearTimeout(cloudSaveTimer);
+  cloudOfficeUser=null;
+  cloudStateHydrated=false;
+
+  if(firebaseAuth){
+    try{await firebaseAuth.signOut();}catch(error){console.warn("Firebase sign-out failed",error);}
+  }
+
   if(window.google?.accounts?.id){
-    try{ google.accounts.id.disableAutoSelect(); }catch{}
+    try{google.accounts.id.disableAutoSelect();}catch{}
   }
   showGoogleScreen();
 }
@@ -811,11 +732,6 @@ function render(){
 
   if(!session.loggedIn){
     showLogin();
-    return;
-  }
-
-  if(session.role === "admin" && !isOfficeSetupComplete()){
-    showOfficeSetupScreen();
     return;
   }
 
@@ -1269,23 +1185,25 @@ function settingsPage(){
 }
 
 function saveSettings(){
-  const officeId=(document.getElementById("officeIdInput")?.value || "").trim();
-  const password=document.getElementById("officePasswordInput")?.value || "";
-  if(!officeId){alert("Office ID cannot be empty.");return;}
-  state.settings.officeId=officeId;
-  if(password) state.settings.officePassword=password;
-  state.settings.officeSetupComplete=true;
-  saveData();
-  toast("Settings saved");
-  render();
+  toast("Office account credentials are managed by the online account.");
 }
 
-function resetApplication(){
-  if(!confirm("Delete all workers and attendance records from this browser?")) return;
+async function resetApplication(){
+  if(!confirm("Delete all workers and attendance records for this office?")) return;
   if(!confirm("This cannot be undone. Continue?")) return;
-  localStorage.removeItem(STORAGE_KEY);
-  sessionStorage.clear();
-  location.reload();
+
+  state.workers=[];
+  saveData();
+
+  if(firebaseReady && cloudOfficeUser && cloudStateHydrated){
+    await saveStateToCloud();
+    toast("Office data reset and synced.");
+  }else{
+    toast("Local office data reset.");
+  }
+  currentPage="dashboard";
+  selectedWorker=null;
+  render();
 }
 
 /* ---------------- WORKER MODAL ---------------- */
@@ -1467,12 +1385,21 @@ function workerSetToday(status){
 
 /* ---------------- LOGOUT / TOAST ---------------- */
 
-function logout(){
+async function logout(){
   session={loggedIn:false,role:null,workerId:null};
   sessionStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(GOOGLE_SESSION_KEY);
   sessionStorage.removeItem("factory_google_email");
   sessionStorage.removeItem("factory_google_signin_time");
+
+  clearTimeout(cloudSaveTimer);
+  cloudOfficeUser=null;
+  cloudStateHydrated=false;
+
+  if(firebaseAuth){
+    try{await firebaseAuth.signOut();}catch(error){console.warn("Firebase sign-out failed",error);}
+  }
+
   currentPage="dashboard";
   selectedWorker=null;
   if(window.google?.accounts?.id){
@@ -1496,6 +1423,14 @@ document.addEventListener("click",event=>{
 });
 
 /* ---------------- START ---------------- */
+if(firebaseReady && firebaseAuth){
+  firebaseAuth.onAuthStateChanged(user=>{
+    if(!user){
+      cloudOfficeUser=null;
+      cloudStateHydrated=false;
+    }
+  });
+}
 render();
 </script>
 
