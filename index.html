@@ -276,10 +276,11 @@ let session = loadSession();
 
 function defaultState(){
   return {
-    version: 6,
+    version: 7,
     settings: {
-      officeId: "admin",
-      officePassword: "admin123"
+      officeId: "",
+      officePassword: "",
+      officeSetupComplete: false
     },
     workers: []
   };
@@ -289,12 +290,26 @@ function loadState(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return defaultState();
+
     const parsed = JSON.parse(raw);
     const base = defaultState();
+    const settings = {...base.settings, ...(parsed.settings || {})};
+
+    // Migration for older builds that used admin/admin123 by default.
+    // Existing custom credentials stay configured; the old default pair
+    // is treated as "not set up yet" so the owner can create their own.
+    if(typeof settings.officeSetupComplete !== "boolean"){
+      settings.officeSetupComplete = !(
+        String(settings.officeId || "") === "admin" &&
+        String(settings.officePassword || "") === "admin123"
+      );
+    }
+
     return {
       ...base,
       ...parsed,
-      settings: {...base.settings, ...(parsed.settings || {})},
+      version: 7,
+      settings,
       workers: Array.isArray(parsed.workers) ? parsed.workers : []
     };
   }catch(error){
@@ -319,6 +334,74 @@ function loadSession(){
 
 function saveSession(){
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+function isOfficeSetupComplete(){
+  return state.settings?.officeSetupComplete === true &&
+    String(state.settings.officeId || "").trim() !== "" &&
+    String(state.settings.officePassword || "") !== "";
+}
+
+function showOfficeSetupScreen(){
+  document.getElementById("root").innerHTML = `
+    <div class="login-screen">
+      <div class="login-card">
+        <div class="brand-mark">FA</div>
+        <h1>Create Office Account</h1>
+        <p class="subtitle">Set the Office ID and password you'll use to enter the admin dashboard.</p>
+
+        <div class="form-group">
+          <label>Office ID</label>
+          <input id="setupOfficeId" autocomplete="username" placeholder="e.g. myfactory">
+        </div>
+
+        <div class="form-group">
+          <label>Office Password</label>
+          <input id="setupOfficePassword" type="password" autocomplete="new-password" placeholder="Create a password">
+        </div>
+
+        <div class="form-group">
+          <label>Confirm Password</label>
+          <input id="setupOfficePasswordConfirm" type="password" autocomplete="new-password" placeholder="Re-enter password">
+        </div>
+
+        <button class="btn primary full" onclick="completeOfficeSetup()">Create Office Account</button>
+        <p class="small" style="margin:13px 0 0;text-align:center">
+          These credentials are saved in this browser and can be changed later from Settings.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+function completeOfficeSetup(){
+  const id=(document.getElementById("setupOfficeId")?.value || "").trim();
+  const password=document.getElementById("setupOfficePassword")?.value || "";
+  const confirmPassword=document.getElementById("setupOfficePasswordConfirm")?.value || "";
+
+  if(id.length < 3){
+    alert("Office ID must be at least 3 characters.");
+    return;
+  }
+
+  if(password.length < 6){
+    alert("Office password must be at least 6 characters.");
+    return;
+  }
+
+  if(password !== confirmPassword){
+    alert("Passwords do not match.");
+    return;
+  }
+
+  state.settings.officeId=id;
+  state.settings.officePassword=password;
+  state.settings.officeSetupComplete=true;
+  saveData();
+
+  authMode="office";
+  toast("Office account created successfully");
+  showLogin();
 }
 
 function esc(value){
@@ -609,6 +692,11 @@ function showLogin(){
     return;
   }
 
+  if(!isOfficeSetupComplete()){
+    showOfficeSetupScreen();
+    return;
+  }
+
   document.getElementById("root").innerHTML = `
     <div class="login-screen">
       <div class="login-card">
@@ -655,7 +743,7 @@ function renderAuthForm(){
         <input id="officeLoginPassword" type="password" autocomplete="current-password" placeholder="Password">
       </div>
       <button class="btn primary full" onclick="officeLogin()">Login to Office</button>
-      <p class="small" style="text-align:center;margin:13px 0 0">Default: <b>admin</b> / <b>admin123</b></p>
+      <p class="small" style="text-align:center;margin:13px 0 0">Use the Office ID and password created during setup.</p>
     `;
   }else{
     wrap.innerHTML=`
@@ -723,6 +811,11 @@ function render(){
 
   if(!session.loggedIn){
     showLogin();
+    return;
+  }
+
+  if(session.role === "admin" && !isOfficeSetupComplete()){
+    showOfficeSetupScreen();
     return;
   }
 
@@ -1181,6 +1274,7 @@ function saveSettings(){
   if(!officeId){alert("Office ID cannot be empty.");return;}
   state.settings.officeId=officeId;
   if(password) state.settings.officePassword=password;
+  state.settings.officeSetupComplete=true;
   saveData();
   toast("Settings saved");
   render();
