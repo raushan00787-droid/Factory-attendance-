@@ -303,6 +303,10 @@ function isFirebaseConfigured(){
 }
 
 function initFirebase(){
+  if(!window.firebase || typeof window.firebase.initializeApp !== "function"){
+    console.warn("Firebase SDK is unavailable. Local fallback mode is active.");
+    return false;
+  }
   if(!isFirebaseConfigured()){
     console.warn("Firebase not configured. Local fallback mode is active.");
     return false;
@@ -311,9 +315,12 @@ function initFirebase(){
     firebaseApp=firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
     firebaseAuth=firebase.auth();
     firestoreDb=firebase.firestore();
-    return true;
+    return !!(firebaseAuth && firestoreDb);
   }catch(error){
-    console.error("Firebase initialization failed",error);
+    console.error("Firebase initialization failed. Local fallback mode is active.",error);
+    firebaseApp=null;
+    firebaseAuth=null;
+    firestoreDb=null;
     return false;
   }
 }
