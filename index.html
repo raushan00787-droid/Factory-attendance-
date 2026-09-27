@@ -724,6 +724,161 @@ async function restartGoogleLogin(){
   showGoogleScreen();
 }
 
+
+/* ---------------- GOOGLE / SESSION AUTH ---------------- */
+
+function loadSession(){
+  try{
+    const raw=sessionStorage.getItem(SESSION_KEY);
+    if(!raw) return {loggedIn:false,role:null,workerId:null};
+    const parsed=JSON.parse(raw);
+    return {
+      loggedIn:parsed.loggedIn===true,
+      role:parsed.role||null,
+      workerId:parsed.workerId||null
+    };
+  }catch(error){
+    console.warn("Session restore failed",error);
+    return {loggedIn:false,role:null,workerId:null};
+  }
+}
+
+function saveSession(){
+  sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));
+}
+
+function hasGoogleSession(){
+  return sessionStorage.getItem(GOOGLE_SESSION_KEY)==="1";
+}
+
+function showGoogleScreen(){
+  document.getElementById("root").innerHTML=`
+    <div class="login-screen">
+      <div class="login-card">
+        <div class="brand-mark">FA</div>
+        <h1>Factory Attendance</h1>
+        <p class="subtitle">Sign in to access your factory attendance system.</p>
+
+        <div class="google-stage">
+          <div class="google-title">Google Account</div>
+          <div class="google-copy">Use your Google account to identify the office administrator.</div>
+          <div id="googleButton"></div>
+          <div id="googleStatus" class="google-status">Loading Google Sign-In…</div>
+        </div>
+
+        <div class="login-divider"><span>or</span></div>
+        <button class="btn secondary full" onclick="continueLocalMode()">Continue in Local Mode</button>
+        <div class="small" style="text-align:center;margin-top:10px">Local Mode keeps data on this device. Google/Firebase cloud sync requires its provider settings to be configured.</div>
+      </div>
+    </div>
+  `;
+
+  initializeGoogleSignIn();
+}
+
+function setGoogleStatus(message){
+  const el=document.getElementById("googleStatus");
+  if(el) el.textContent=message;
+}
+
+function initializeGoogleSignIn(){
+  if(!window.google?.accounts?.id){
+    setGoogleStatus("Google Sign-In is still loading…");
+    let tries=0;
+    const timer=setInterval(()=>{
+      tries++;
+      if(window.google?.accounts?.id){
+        clearInterval(timer);
+        initializeGoogleSignIn();
+      }else if(tries>=20){
+        clearInterval(timer);
+        setGoogleStatus("Google Sign-In is unavailable. You can use Local Mode.");
+      }
+    },300);
+    return;
+  }
+
+  if(googleInitialized){
+    try{
+      google.accounts.id.renderButton(document.getElementById("googleButton"),{
+        theme:"outline",
+        size:"large",
+        text:"continue_with",
+        shape:"rectangular",
+        width:320
+      });
+      setGoogleStatus("Ready");
+    }catch(error){
+      console.error("Google button render failed",error);
+      setGoogleStatus("Google Sign-In could not load. You can use Local Mode.");
+    }
+    return;
+  }
+
+  try{
+    google.accounts.id.initialize({
+      client_id:GOOGLE_CLIENT_ID,
+      callback:handleGoogleCredential,
+      auto_select:false,
+      cancel_on_tap_outside:true
+    });
+    googleInitialized=true;
+    google.accounts.id.renderButton(document.getElementById("googleButton"),{
+      theme:"outline",
+      size:"large",
+      text:"continue_with",
+      shape:"rectangular",
+      width:320
+    });
+    setGoogleStatus("Ready");
+  }catch(error){
+    console.error("Google initialization failed",error);
+    setGoogleStatus("Google Sign-In is not configured for this website. You can use Local Mode.");
+  }
+}
+
+function handleGoogleCredential(response){
+  try{
+    if(!response?.credential){
+      setGoogleStatus("Google did not return a credential. Try again or use Local Mode.");
+      return;
+    }
+
+    const payload=decodeJwtPayload(response.credential);
+    const email=String(payload.email||"").trim();
+    const name=String(payload.name||"").trim();
+
+    sessionStorage.setItem(GOOGLE_SESSION_KEY,"1");
+    sessionStorage.setItem("factory_google_email",email||"Google account");
+    sessionStorage.setItem("factory_google_name",name);
+    sessionStorage.setItem("factory_google_signin_time",new Date().toISOString());
+
+    setGoogleStatus("Signed in. Opening Office Access…");
+    showOfficeAccessChooser();
+  }catch(error){
+    console.error("Google credential handling failed",error);
+    setGoogleStatus("Could not read the Google sign-in response. You can use Local Mode.");
+  }
+}
+
+function decodeJwtPayload(token){
+  const parts=String(token).split(".");
+  if(parts.length!==3) throw new Error("Invalid Google credential");
+  const base64=parts[1].replace(/-/g,"+").replace(/_/g,"/");
+  const padded=base64+"=".repeat((4-base64.length%4)%4);
+  const binary=atob(padded);
+  const bytes=Uint8Array.from(binary,char=>char.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function continueLocalMode(){
+  sessionStorage.setItem(GOOGLE_SESSION_KEY,"1");
+  sessionStorage.setItem("factory_google_email","Local device mode");
+  sessionStorage.setItem("factory_google_name","Local");
+  sessionStorage.setItem("factory_google_signin_time",new Date().toISOString());
+  showOfficeAccessChooser();
+}
+
 /* ---------------- RENDER ---------------- */
 
 function render(){
